@@ -23,10 +23,10 @@ jobs:
         with:
           gradle-version: 8.5
 
-      - name: Assemble Debug APK
+      - name: Build with Gradle
         run: gradle assembleDebug --stacktrace
 
-      - name: Upload APK Artifact
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: Kontur-Security-APK
