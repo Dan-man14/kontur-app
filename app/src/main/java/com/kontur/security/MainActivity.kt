@@ -3,46 +3,37 @@ package com.kontur.security
 import android.Manifest
 import android.annotation.SuppressLint
 import android.app.Activity
-import android.content.ClipData
-import android.content.ClipboardManager
-import android.content.ContentValues
-import android.content.Context
-import android.content.Intent
+import android.content.*
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
 import android.location.Location
 import android.location.LocationManager
 import android.net.Uri
 import android.net.VpnService
-import android.os.Build
-import android.os.Bundle
-import android.os.Environment
-import android.os.Handler
-import android.os.Looper
-import android.os.ParcelFileDescriptor
-import android.os.SystemClock
+import android.net.wifi.WifiManager
+import android.os.*
 import android.provider.MediaStore
 import android.provider.Settings
-import android.telephony.CellInfoGsm
-import android.telephony.CellInfoLte
-import android.telephony.CellInfoWcdma
-import android.telephony.TelephonyManager
+import android.telephony.*
 import android.util.Base64
-import android.webkit.JavascriptInterface
-import android.webkit.PermissionRequest
-import android.webkit.ValueCallback
-import android.webkit.WebChromeClient
-import android.webkit.WebResourceRequest
-import android.webkit.WebSettings
-import android.webkit.WebView
-import android.webkit.WebViewClient
+import android.view.WindowManager
+import android.webkit.*
 import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
+import androidx.biometric.BiometricPrompt
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import org.json.JSONArray
 import org.json.JSONObject
+import java.io.BufferedReader
+import java.io.InputStreamReader
+import java.net.HttpURLConnection
+import java.net.InetSocketAddress
+import java.net.Socket
+import java.net.URL
+import java.util.concurrent.Callable
+import java.util.concurrent.Executors
 import kotlin.math.cos
 import kotlin.math.sin
 import kotlin.random.Random
@@ -53,21 +44,24 @@ class MainActivity : AppCompatActivity() {
     private val mainHandler = Handler(Looper.getMainLooper())
     private var fileUploadCallback: ValueCallback<Array<Uri>>? = null
 
-    // Параметры Fake GPS
+    // Состояние Fake GPS
     private var mockActive = false
-    private var mockLat = 55.7558
-    private var mockLon = 37.6173
-    private var mockAlt = 155.0
+    private var mockLat = 55.75582
+    private var mockLon = 37.61730
+    private var mockAlt = 158.0
     private var mockSpeed = 0.0f
-    private var mockBearing = 0.0f
+    private var mockBearing = 45.0f
     private var mockJitter = true
     private var mockMoveMode = false
+
+    private var pendingVpnPackages: ArrayList<String> = arrayListOf()
+    private var pendingVpnDns: String = "1.1.1.1"
 
     private val mockRunnable = object : Runnable {
         override fun run() {
             if (mockActive) {
                 pushMockLocation()
-                mainHandler.postDelayed(this, 1000)
+                mainHandler.postDelayed(this, 600)
             }
         }
     }
@@ -75,6 +69,10 @@ class MainActivity : AppCompatActivity() {
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // Принудительное включение 120 Гц (High Refresh Rate) и аппаратного ускорения GPU
+        window.addFlags(WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED)
+        enableHighRefreshRate()
 
         requestNecessaryPermissions()
 
@@ -94,12 +92,12 @@ class MainActivity : AppCompatActivity() {
             webViewClient = object : WebViewClient() {
                 override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
                     val url = request?.url?.toString() ?: return false
-                    if (url.startsWith("tg://") || url.startsWith("https://t.me/")) {
+                    if (url.startsWith("tg://") || url.startsWith("https://t.me/") || url.startsWith("https://wa.me/")) {
                         return try {
                             startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
                             true
                         } catch (e: Exception) {
-                            Toast.makeText(this@MainActivity, "Telegram не установлен", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(this@MainActivity, "Приложение не найдено", Toast.LENGTH_SHORT).show()
                             true
                         }
                     }
@@ -123,7 +121,7 @@ class MainActivity : AppCompatActivity() {
                         addCategory(Intent.CATEGORY_OPENABLE)
                         type = "image/*"
                     }
-                    startActivityForResult(Intent.createChooser(intent, "Выберите фото или камеру"), 1002)
+                    startActivityForResult(Intent.createChooser(intent, "Выберите изображение или камеру"), 1002)
                     return true
                 }
             }
@@ -144,10 +142,27 @@ class MainActivity : AppCompatActivity() {
         })
     }
 
+    @Suppress("DEPRECATION")
+    private fun enableHighRefreshRate() {
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                val display = windowManager.defaultDisplay
+                val modes = display.supportedModes
+                val maxMode = modes.maxByOrNull { it.refreshRate }
+                if (maxMode != null) {
+                    val params = window.attributes
+                    params.preferredDisplayModeId = maxMode.modeId
+                    window.attributes = params
+                }
+            }
+        } catch (_: Exception) {}
+    }
+
     private fun requestNecessaryPermissions() {
         val perms = arrayOf(
             Manifest.permission.ACCESS_FINE_LOCATION,
             Manifest.permission.ACCESS_COARSE_LOCATION,
+            Manifest.permission.READ_PHONE_STATE,
             Manifest.permission.CAMERA
         )
         val needed = perms.filter {
@@ -164,40 +179,35 @@ class MainActivity : AppCompatActivity() {
         val providers = listOf(LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER)
 
         if (mockMoveMode && mockSpeed > 0f) {
-            val distMeters = mockSpeed.toDouble()
+            val distMeters = mockSpeed.toDouble() * 0.6
             val rad = Math.toRadians(mockBearing.toDouble())
             mockLat += (distMeters * cos(rad)) / 111320.0
             mockLon += (distMeters * sin(rad)) / (111320.0 * cos(Math.toRadians(mockLat)))
         }
 
-        val jitterLat = if (mockJitter) (Random.nextDouble(-0.000012, 0.000012)) else 0.0
-        val jitterLon = if (mockJitter) (Random.nextDouble(-0.000012, 0.000012)) else 0.0
+        val jitterLat = if (mockJitter) Random.nextDouble(-0.000010, 0.000010) else 0.0
+        val jitterLon = if (mockJitter) Random.nextDouble(-0.000010, 0.000010) else 0.0
 
         for (provider in providers) {
             try {
                 try {
-                    lm.addTestProvider(
-                        provider,
-                        false, false, false, false, true, true, true,
-                        1, 1
-                    )
+                    lm.addTestProvider(provider, false, false, false, false, true, true, true, 1, 1)
                 } catch (_: Exception) {}
-
                 lm.setTestProviderEnabled(provider, true)
 
                 val loc = Location(provider).apply {
                     latitude = mockLat + jitterLat
                     longitude = mockLon + jitterLon
                     altitude = mockAlt
-                    accuracy = if (mockJitter) Random.nextFloat() * 2.5f + 2.5f else 3.0f
+                    accuracy = if (mockJitter) Random.nextFloat() * 1.8f + 1.5f else 2.0f
                     speed = mockSpeed
                     bearing = mockBearing
                     time = System.currentTimeMillis()
                     elapsedRealtimeNanos = SystemClock.elapsedRealtimeNanos()
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                        verticalAccuracyMeters = 2.5f
-                        speedAccuracyMetersPerSecond = 0.5f
-                        bearingAccuracyDegrees = 5.0f
+                        verticalAccuracyMeters = 1.5f
+                        speedAccuracyMetersPerSecond = 0.2f
+                        bearingAccuracyDegrees = 2.0f
                     }
                 }
                 lm.setTestProviderLocation(provider, loc)
@@ -206,6 +216,15 @@ class MainActivity : AppCompatActivity() {
                 return
             } catch (_: Exception) {}
         }
+    }
+
+    private fun startKonturVpnService() {
+        val intent = Intent(this, KonturVpnService::class.java).apply {
+            action = "START_VPN"
+            putStringArrayListExtra("PACKAGES", pendingVpnPackages)
+            putExtra("DNS", pendingVpnDns)
+        }
+        startService(intent)
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
@@ -219,25 +238,161 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private var pendingVpnPackages: ArrayList<String> = arrayListOf()
-    private var pendingVpnDns: String = "1.1.1.1"
-
-    private fun startKonturVpnService() {
-        val intent = Intent(this, KonturVpnService::class.java).apply {
-            action = "START_VPN"
-            putStringArrayListExtra("PACKAGES", pendingVpnPackages)
-            putExtra("DNS", pendingVpnDns)
-        }
-        startService(intent)
-    }
-
     inner class AndroidBridge {
 
+        // 1. БИОМЕТРИЧЕСКИЙ СКАНЕР ОТПЕЧАТКА ПАЛЬЦА
+        @JavascriptInterface
+        fun authenticateBiometric() {
+            runOnUiThread {
+                try {
+                    val executor = ContextCompat.getMainExecutor(this@MainActivity)
+                    val prompt = BiometricPrompt(
+                        this@MainActivity,
+                        executor,
+                        object : BiometricPrompt.AuthenticationCallback() {
+                            override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
+                                super.onAuthenticationSucceeded(result)
+                                vibrate(40)
+                                webView.evaluateJavascript("window.onBiometricSuccess && window.onBiometricSuccess()", null)
+                            }
+
+                            override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
+                                super.onAuthenticationError(errorCode, errString)
+                                webView.evaluateJavascript("window.onBiometricError && window.onBiometricError('${errString}')", null)
+                            }
+
+                            override fun onAuthenticationFailed() {
+                                super.onAuthenticationFailed()
+                                vibrate(120)
+                            }
+                        }
+                    )
+
+                    val info = BiometricPrompt.PromptInfo.Builder()
+                        .setTitle("КОНТУР-М // СПЕЦДОПУСК")
+                        .setSubtitle("Приложите отпечаток пальца для разблокировки терминала")
+                        .setNegativeButtonText("Ввести ПИН-код")
+                        .build()
+
+                    prompt.authenticate(info)
+                } catch (e: Exception) {
+                    webView.evaluateJavascript("window.onBiometricError && window.onBiometricError('Биометрия недоступна')", null)
+                }
+            }
+        }
+
+        // 2. ТАКТИЛЬНАЯ ВИБРАЦИЯ
+        @Suppress("DEPRECATION")
+        @JavascriptInterface
+        fun vibrate(ms: Long) {
+            try {
+                val v = getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    v.vibrate(VibrationEffect.createOneShot(ms, VibrationEffect.DEFAULT_AMPLITUDE))
+                } else {
+                    v.vibrate(ms)
+                }
+            } catch (_: Exception) {}
+        }
+
+        // 3. НАТИВНЫЙ HTTP-МОСТ (ОБХОД ЛЮБЫХ БЛОКИРОВОК CORS ДЛЯ SHODAN, ADS-B, CRT.SH, OSINT)
+        @JavascriptInterface
+        fun httpGet(urlStr: String): String {
+            return try {
+                val url = URL(urlStr)
+                val conn = (url.openConnection() as HttpURLConnection).apply {
+                    requestMethod = "GET"
+                    connectTimeout = 8000
+                    readTimeout = 8000
+                    setRequestProperty("User-Agent", "Mozilla/5.0 (X11; Linux x86_64) KonturOSINT/4.0")
+                    setRequestProperty("Accept", "application/json, text/plain, */*")
+                }
+                val code = conn.responseCode
+                val stream = if (code in 200..299) conn.inputStream else conn.errorStream
+                val reader = BufferedReader(InputStreamReader(stream))
+                val sb = StringBuilder()
+                var line: String?
+                while (reader.readLine().also { line = it } != null) {
+                    sb.append(line).append("\n")
+                }
+                reader.close()
+                sb.toString().trim()
+            } catch (e: Exception) {
+                "ERR:${e.message}"
+            }
+        }
+
+        // 4. НАТИВНЫЙ МНОГОПОТОЧНЫЙ СКАНЕР TCP-ПОРТОВ
+        @JavascriptInterface
+        fun scanTcpPorts(host: String, portsCsv: String): String {
+            val ports = portsCsv.split(",").mapNotNull { it.trim().toIntOrNull() }
+            val pool = Executors.newFixedThreadPool(12)
+            val tasks = ports.map { port ->
+                Callable {
+                    val t0 = System.currentTimeMillis()
+                    try {
+                        val sock = Socket()
+                        sock.connect(InetSocketAddress(host.trim(), port), 450)
+                        sock.close()
+                        val rtt = System.currentTimeMillis() - t0
+                        JSONObject().apply {
+                            put("port", port)
+                            put("open", true)
+                            put("ms", rtt)
+                        }
+                    } catch (_: Exception) {
+                        null
+                    }
+                }
+            }
+            val arr = JSONArray()
+            try {
+                val results = pool.invokeAll(tasks)
+                for (r in results) {
+                    val obj = r.get()
+                    if (obj != null) arr.put(obj)
+                }
+            } catch (_: Exception) {}
+            pool.shutdown()
+            return arr.toString()
+        }
+
+        // 5. АППАРАТНАЯ КРИМИНАЛИСТИКА УСТРОЙСТВА И WI-FI
+        @Suppress("DEPRECATION")
+        @JavascriptInterface
+        fun getHardwareForensics(): String {
+            val obj = JSONObject()
+            try {
+                obj.put("model", "${Build.MANUFACTURER} ${Build.MODEL}")
+                obj.put("board", "${Build.BOARD} / ${Build.HARDWARE}")
+                obj.put("android", "Android ${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})")
+                obj.put("patch", Build.VERSION.SECURITY_PATCH)
+                obj.put("fingerprint", Build.FINGERPRINT)
+                obj.put("abis", Build.SUPPORTED_ABIS.joinToString(", "))
+
+                val wm = applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
+                val ipInt = wm.connectionInfo.ipAddress
+                val localIp = String.format(
+                    "%d.%d.%d.%d",
+                    ipInt and 0xff,
+                    ipInt shr 8 and 0xff,
+                    ipInt shr 16 and 0xff,
+                    ipInt shr 24 and 0xff
+                )
+                obj.put("localIp", localIp)
+                obj.put("rssi", "${wm.connectionInfo.rssi} dBm")
+                obj.put("linkSpeed", "${wm.connectionInfo.linkSpeed} Mbps")
+            } catch (_: Exception) {}
+            return obj.toString()
+        }
+
+        // 6. БУФЕР ОБМЕНА
         @JavascriptInterface
         fun copyToClipboard(text: String): Boolean {
             return try {
                 val cb = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                 cb.setPrimaryClip(ClipData.newPlainText("КОНТУР-М", text))
+                vibrate(25)
                 runOnUiThread {
                     Toast.makeText(this@MainActivity, "Скопировано в буфер обмена", Toast.LENGTH_SHORT).show()
                 }
@@ -257,6 +412,7 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
+        // 7. FAKE GPS (СИСТЕМНАЯ ПОДМЕНА КООРДИНАТ)
         @JavascriptInterface
         fun startFakeGps(
             lat: Double,
@@ -286,6 +442,7 @@ class MainActivity : AppCompatActivity() {
                 mockActive = true
                 mainHandler.removeCallbacks(mockRunnable)
                 mainHandler.post(mockRunnable)
+                vibrate(50)
                 "OK"
             } catch (e: SecurityException) {
                 mockActive = false
@@ -311,28 +468,15 @@ class MainActivity : AppCompatActivity() {
         }
 
         @JavascriptInterface
-        fun getMockCoordinates(): String {
-            val obj = JSONObject()
-            obj.put("active", mockActive)
-            obj.put("lat", mockLat)
-            obj.put("lon", mockLon)
-            obj.put("alt", mockAlt)
-            return obj.toString()
-        }
-
-        @JavascriptInterface
         fun openDeveloperSettings() {
             try {
-                val intent = Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS)
-                intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
-                startActivity(intent)
+                startActivity(Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS).setFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
             } catch (e: Exception) {
-                val intent = Intent(Settings.ACTION_SETTINGS)
-                intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
-                startActivity(intent)
+                startActivity(Intent(Settings.ACTION_SETTINGS).setFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
             }
         }
 
+        // 8. ПЕРЕХВАТ БАЗОВЫХ СТАНЦИЙ МОДЕМА (BTS)
         @SuppressLint("MissingPermission")
         @JavascriptInterface
         fun getNativeCellTowers(): String {
@@ -374,6 +518,7 @@ class MainActivity : AppCompatActivity() {
             return arr.toString()
         }
 
+        // 9. СПИСОК ПРИЛОЖЕНИЙ И SPLIT-VPN
         @JavascriptInterface
         fun getInstalledApps(): String {
             val arr = JSONArray()
@@ -414,10 +559,7 @@ class MainActivity : AppCompatActivity() {
         fun toggleVpn(enable: Boolean, packagesCsv: String, dns: String): String {
             return try {
                 if (!enable) {
-                    val intent = Intent(this@MainActivity, KonturVpnService::class.java).apply {
-                        action = "STOP_VPN"
-                    }
-                    startService(intent)
+                    startService(Intent(this@MainActivity, KonturVpnService::class.java).setAction("STOP_VPN"))
                     "VPN_STOPPED"
                 } else {
                     pendingVpnPackages = ArrayList(packagesCsv.split(",").map { it.trim() }.filter { it.isNotEmpty() })
@@ -437,18 +579,13 @@ class MainActivity : AppCompatActivity() {
         }
 
         @JavascriptInterface
-        fun openTelegramLink(url: String) {
+        fun openExternalLink(url: String) {
             try {
-                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
-                intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
-                startActivity(intent)
-            } catch (e: Exception) {
-                runOnUiThread {
-                    Toast.makeText(this@MainActivity, "Не удалось открыть ссылку", Toast.LENGTH_SHORT).show()
-                }
-            }
+                startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)).setFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            } catch (_: Exception) {}
         }
 
+        // 10. СОХРАНЕНИЕ СПЕЦ-ФОТО С GPS ШТАМПОМ В ГАЛЕРЕЮ И ОТПРАВКА
         @JavascriptInterface
         fun savePhotoToGallery(base64Data: String, shareImmediately: Boolean): String {
             return try {
@@ -472,6 +609,7 @@ class MainActivity : AppCompatActivity() {
                     out.flush()
                 }
 
+                vibrate(60)
                 runOnUiThread {
                     Toast.makeText(this@MainActivity, "Сохранено в Галерею: DCIM/Kontur-M/$fileName", Toast.LENGTH_LONG).show()
                 }
@@ -494,7 +632,7 @@ class MainActivity : AppCompatActivity() {
         fun setCustomUserAgent(ua: String) {
             runOnUiThread {
                 webView.settings.userAgentString = ua
-                Toast.makeText(this@MainActivity, "User-Agent подменён!", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this@MainActivity, "User-Agent изменен", Toast.LENGTH_SHORT).show()
             }
         }
     }
