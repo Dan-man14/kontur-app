@@ -3,83 +3,106 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>КОНТУР-М // v2.0 PRO</title>
+  <title>КОНТУР-М // v4.0 ФАНТОМ</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <style>
     :root {
-      --bg: #06080d;
-      --card: #0c111b;
-      --border: #19253a;
+      --bg: #04060a;
+      --card: #0a0f18;
+      --border: #17243a;
       --cyan: #00f3ff;
       --green: #00ff66;
-      --red: #ff2a4b;
+      --red: #ff2442;
       --yellow: #ffb700;
       --purple: #b84dff;
-      --text: #d0e1f9;
-      --dim: #637996;
+      --text: #d4e4f7;
+      --dim: #5e7491;
       --mono: 'Courier New', Courier, monospace;
     }
-    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; user-select: none; }
     body {
       background: var(--bg);
       color: var(--text);
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      padding-bottom: 72px;
+      padding-bottom: 70px;
       overflow-x: hidden;
     }
-    header {
-      background: rgba(12, 17, 27, 0.96);
-      border-bottom: 1px solid var(--cyan);
-      padding: 10px 14px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      position: sticky;
-      top: 0;
-      z-index: 1000;
+
+    /* ЭКРАН БЛОКИРОВКИ (ПИН + ОТПЕЧАТОК ПАЛЬЦА) */
+    #lockScreen {
+      position: fixed; inset: 0; background: radial-gradient(circle at center, #0c1726 0%, #030508 100%);
+      z-index: 9999; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 20px;
     }
-    .brand { font-family: var(--mono); font-size: 13px; font-weight: bold; color: var(--cyan); letter-spacing: 1px; }
+    .lock-logo {
+      font-family: var(--mono); font-size: 18px; font-weight: bold; color: var(--cyan);
+      letter-spacing: 2px; margin-bottom: 6px; text-shadow: 0 0 12px rgba(0,243,255,0.5);
+    }
+    .lock-sub { font-family: var(--mono); font-size: 11px; color: var(--dim); margin-bottom: 22px; text-align: center; }
+    .pin-dots { display: flex; gap: 14px; margin-bottom: 24px; }
+    .pin-dot {
+      width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--cyan);
+      transition: transform 0.1s, background 0.1s;
+    }
+    .pin-dot.filled { background: var(--cyan); box-shadow: 0 0 10px var(--cyan); transform: scale(1.1); }
+    .pin-dot.error { border-color: var(--red); background: var(--red); box-shadow: 0 0 10px var(--red); }
+
+    .numpad { display: grid; grid-template-columns: repeat(3, 74px); gap: 12px; margin-bottom: 18px; }
+    .num-key {
+      height: 62px; border-radius: 12px; background: rgba(14, 23, 38, 0.85); border: 1px solid var(--border);
+      color: #fff; font-family: var(--mono); font-size: 22px; font-weight: bold;
+      display: flex; justify-content: center; align-items: center; cursor: pointer;
+    }
+    .num-key:active { background: var(--cyan); color: #000; border-color: var(--cyan); }
+    .bio-btn {
+      width: 246px; padding: 12px; border-radius: 10px; background: rgba(0, 255, 102, 0.12);
+      border: 1px solid var(--green); color: var(--green); font-family: var(--mono);
+      font-size: 12px; font-weight: bold; text-align: center; cursor: pointer;
+    }
+    .bio-btn:active { background: var(--green); color: #000; }
+
+    /* ВЕРХНЯЯ ПАНЕЛЬ */
+    header {
+      background: rgba(10, 15, 24, 0.96); border-bottom: 1px solid var(--cyan);
+      padding: 10px 12px; display: flex; justify-content: space-between; align-items: center;
+      position: sticky; top: 0; z-index: 1000;
+    }
+    .brand { font-family: var(--mono); font-size: 12px; font-weight: bold; color: var(--cyan); letter-spacing: 1px; }
+    .top-badges { display: flex; gap: 6px; align-items: center; }
     .badge {
-      font-family: var(--mono); font-size: 10px; padding: 3px 7px; border-radius: 4px;
+      font-family: var(--mono); font-size: 9px; padding: 3px 6px; border-radius: 4px;
       background: rgba(0, 255, 102, 0.12); border: 1px solid var(--green); color: var(--green);
     }
-    .badge.spoof { background: rgba(255, 42, 75, 0.18); border-color: var(--red); color: var(--red); animation: blink 1.2s infinite; }
-    @keyframes blink { 50% { opacity: 0.4; } }
+    .badge.spoof { background: rgba(255, 36, 66, 0.2); border-color: var(--red); color: var(--red); animation: blink 1s infinite; }
+    @keyframes blink { 50% { opacity: 0.35; } }
 
-    .screen { display: none; padding: 12px; }
+    .screen { display: none; padding: 10px; }
     .screen.active { display: block; }
 
     .card {
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 12px;
-      margin-bottom: 12px;
+      background: var(--card); border: 1px solid var(--border); border-radius: 8px;
+      padding: 11px; margin-bottom: 10px;
     }
     .card-title {
       font-size: 11px; font-family: var(--mono); color: var(--cyan);
       text-transform: uppercase; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center;
     }
 
-    #map {
-      width: 100%; height: 320px; border-radius: 8px; border: 1px solid var(--cyan);
-      margin-bottom: 10px; background: #05070b; z-index: 1;
-    }
-    .map-Layer-bar, .btn-row { display: flex; gap: 6px; margin-bottom: 8px; flex-wrap: wrap; }
+    #map { width: 100%; height: 310px; border-radius: 8px; border: 1px solid var(--cyan); margin-bottom: 8px; background: #05070b; z-index: 1; }
+    .btn-row { display: flex; gap: 5px; margin-bottom: 8px; flex-wrap: wrap; }
     .chip {
-      flex: 1; min-width: 75px; text-align: center; padding: 7px 6px; font-size: 10px;
-      font-family: var(--mono); background: #080c14; border: 1px solid var(--border);
+      flex: 1; min-width: 68px; text-align: center; padding: 7px 4px; font-size: 10px;
+      font-family: var(--mono); background: #060a12; border: 1px solid var(--border);
       color: var(--text); border-radius: 5px; cursor: pointer; font-weight: bold;
     }
-    .chip.active { border-color: var(--cyan); background: rgba(0, 243, 255, 0.15); color: var(--cyan); }
-    .chip.green.active { border-color: var(--green); background: rgba(0, 255, 102, 0.18); color: var(--green); }
-    .chip.yellow.active { border-color: var(--yellow); background: rgba(255, 183, 0, 0.18); color: var(--yellow); }
+    .chip.active { border-color: var(--cyan); background: rgba(0, 243, 255, 0.16); color: var(--cyan); }
+    .chip.green.active { border-color: var(--green); background: rgba(0, 255, 102, 0.16); color: var(--green); }
+    .chip.yellow.active { border-color: var(--yellow); background: rgba(255, 183, 0, 0.16); color: var(--yellow); }
 
     input, textarea, select {
-      width: 100%; background: #060911; border: 1px solid var(--border); color: #fff;
-      font-family: var(--mono); font-size: 12px; padding: 9px 10px; border-radius: 6px;
-      margin-bottom: 8px; outline: none;
+      width: 100%; background: #050810; border: 1px solid var(--border); color: #fff;
+      font-family: var(--mono); font-size: 12px; padding: 9px; border-radius: 6px;
+      margin-bottom: 8px; outline: none; user-select: text;
     }
     input:focus, textarea:focus, select:focus { border-color: var(--cyan); }
 
@@ -90,128 +113,217 @@
     }
     .btn:active { background: var(--cyan); color: #000; }
     .btn.green { border-color: var(--green); color: var(--green); background: rgba(0, 255, 102, 0.12); }
-    .btn.red { border-color: var(--red); color: var(--red); background: rgba(255, 42, 75, 0.12); }
+    .btn.red { border-color: var(--red); color: var(--red); background: rgba(255, 36, 66, 0.12); }
     .btn.yellow { border-color: var(--yellow); color: var(--yellow); background: rgba(255, 183, 0, 0.12); }
+    .btn.purple { border-color: var(--purple); color: var(--purple); background: rgba(184, 77, 255, 0.12); }
 
-    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-    .row { display: flex; justify-content: space-between; padding: 5px 0; border-bottom: 1px solid #131c2b; font-size: 11px; font-family: var(--mono); }
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
+    .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; }
+    .row { display: flex; justify-content: space-between; padding: 5px 0; border-bottom: 1px solid #121b2a; font-size: 11px; font-family: var(--mono); }
     .row:last-child { border-bottom: none; }
     .lbl { color: var(--dim); }
     .val { color: #fff; font-weight: bold; text-align: right; max-width: 65%; word-break: break-all; }
 
     .term {
-      background: #04060a; border: 1px solid #141e30; border-radius: 6px; padding: 9px;
+      background: #030508; border: 1px solid #131e30; border-radius: 6px; padding: 9px;
       font-family: var(--mono); font-size: 11px; color: var(--green);
-      max-height: 180px; overflow-y: auto; white-space: pre-wrap; word-break: break-all; margin-top: 8px;
+      max-height: 210px; overflow-y: auto; white-space: pre-wrap; word-break: break-all; margin-top: 8px; user-select: text;
     }
 
-    .app-list { max-height: 190px; overflow-y: auto; border: 1px solid var(--border); border-radius: 6px; padding: 6px; margin-bottom: 8px; background: #05080f; }
+    .app-list { max-height: 180px; overflow-y: auto; border: 1px solid var(--border); border-radius: 6px; padding: 6px; margin-bottom: 8px; background: #04070d; }
     .app-item { display: flex; justify-content: space-between; align-items: center; padding: 6px 4px; border-bottom: 1px solid #101726; font-size: 11px; font-family: var(--mono); }
     .app-item input[type="checkbox"] { width: 18px; height: 18px; margin: 0; }
 
     #camPreviewBox { position: relative; width: 100%; background: #000; border: 1px solid var(--cyan); border-radius: 8px; overflow: hidden; margin-bottom: 8px; }
-    video#camVideo { width: 100%; display: block; max-height: 280px; object-fit: cover; }
+    video#camVideo { width: 100%; display: block; max-height: 250px; object-fit: cover; }
     canvas#photoCanvas { width: 100%; display: block; border-radius: 6px; border: 1px solid var(--green); margin-top: 8px; }
 
     nav.bottom-bar {
       position: fixed; bottom: 0; left: 0; right: 0; height: 62px;
-      background: #090d16; border-top: 1px solid var(--border);
+      background: #070b12; border-top: 1px solid var(--border);
       display: flex; justify-content: space-around; align-items: center; z-index: 1000;
     }
     .nav-btn {
       display: flex; flex-direction: column; align-items: center; color: var(--dim);
-      font-size: 9px; font-family: var(--mono); cursor: pointer; flex: 1; padding: 6px 0;
+      font-size: 9px; font-family: var(--mono); cursor: pointer; flex: 1; padding: 5px 0;
     }
     .nav-btn.active { color: var(--cyan); font-weight: bold; }
-    .nav-btn svg { width: 20px; height: 20px; margin-bottom: 3px; fill: currentColor; }
+    .nav-btn svg { width: 19px; height: 19px; margin-bottom: 3px; fill: currentColor; }
   </style>
 </head>
 <body>
 
+  <!-- ЭКРАН БИОМЕТРИЧЕСКОЙ БЛОКИРОВКИ И ПИН-КОДА -->
+  <div id="lockScreen">
+    <div class="lock-logo">🛡️ КОНТУР-М // ФАНТОМ</div>
+    <div class="lock-sub" id="lockMsg">ВВЕДИТЕ ПИН-КОД (ПО УМОЛЧАНИЮ: 0000) ИЛИ ОТПЕЧАТОК</div>
+    <div class="pin-dots" id="pinDots">
+      <div class="pin-dot"></div>
+      <div class="pin-dot"></div>
+      <div class="pin-dot"></div>
+      <div class="pin-dot"></div>
+    </div>
+    <div class="numpad">
+      <div class="num-key" onclick="pressPin('1')">1</div>
+      <div class="num-key" onclick="pressPin('2')">2</div>
+      <div class="num-key" onclick="pressPin('3')">3</div>
+      <div class="num-key" onclick="pressPin('4')">4</div>
+      <div class="num-key" onclick="pressPin('5')">5</div>
+      <div class="num-key" onclick="pressPin('6')">6</div>
+      <div class="num-key" onclick="pressPin('7')">7</div>
+      <div class="num-key" onclick="pressPin('8')">8</div>
+      <div class="num-key" onclick="pressPin('9')">9</div>
+      <div class="num-key" style="font-size:13px; color:var(--yellow);" onclick="triggerBiometric()">🫆 СКАН</div>
+      <div class="num-key" onclick="pressPin('0')">0</div>
+      <div class="num-key" style="font-size:14px; color:var(--red);" onclick="clearPin()">⌫</div>
+    </div>
+    <div class="bio-btn" onclick="triggerBiometric()">🔓 РАЗБЛОКИРОВАТЬ ОТПЕЧАТКОМ ПАЛЬЦА</div>
+  </div>
+
   <header>
-    <div class="brand">КОНТУР-М // СПЕЦТЕРМИНАЛ v2.0</div>
-    <div class="badge" id="gpsTopBadge">GPS: ШТАТНЫЙ</div>
+    <div class="brand">КОНТУР-М // v4.0 ФАНТОМ</div>
+    <div class="top-badges">
+      <div class="badge" id="fpsBadge">120 HZ</div>
+      <div class="badge" id="gpsTopBadge">GPS: ШТАТНЫЙ</div>
+      <div class="badge" style="border-color:var(--yellow);color:var(--yellow);cursor:pointer;" onclick="lockTerminalNow()">🔒</div>
+    </div>
   </header>
 
   <!-- ВКЛАДКА 1: КАРТА, FAKE GPS, САМОЛЕТЫ, ВЫШКИ -->
   <div id="tab-map" class="screen active">
     <div class="card" style="padding: 8px;">
       <div style="display:flex; gap:6px;">
-        <input type="text" id="mapSearchInput" placeholder="Поиск: город, улица, дом..." style="margin-bottom:0;">
-        <button class="btn" style="width:90px;" onclick="searchAddress()">НАЙТИ</button>
+        <input type="text" id="mapSearchInput" placeholder="Поиск: город, улица, номер дома..." style="margin-bottom:0;">
+        <button class="btn" style="width:85px;" onclick="searchAddress()">НАЙТИ</button>
       </div>
-      <div class="map-Layer-bar" style="margin-top:8px; margin-bottom:0;">
+      <div class="btn-row" style="margin-top:7px; margin-bottom:0;">
         <div class="chip active" id="layerDark" onclick="setMapLayer('dark')">ТЁМНАЯ</div>
         <div class="chip" id="layerOsm" onclick="setMapLayer('osm')">ДОМА / СХЕМА</div>
         <div class="chip" id="layerSat" onclick="setMapLayer('sat')">СПУТНИК</div>
+        <div class="chip" id="layerTopo" onclick="setMapLayer('topo')">ВЫСОТЫ</div>
       </div>
     </div>
 
     <div id="map"></div>
 
-    <!-- Тумблеры воздушной и сотовой разведки -->
+    <!-- Живые радары -->
     <div class="btn-row">
       <div class="chip yellow" id="btnPlanes" onclick="togglePlanes()">✈️ САМОЛЁТЫ (LIVE)</div>
       <div class="chip green" id="btnTowers" onclick="toggleCellTowers()">📡 ВЫШКИ НА КАРТЕ</div>
-      <div class="chip" onclick="scanNativeCells()">📶 МОДЕМ ТЕЛЕФОНА</div>
+      <div class="chip" onclick="scanNativeCells()">📶 МОДЕМ SIM</div>
     </div>
 
-    <!-- Блок управления FAKE GPS -->
+    <!-- Управление Fake GPS + Джойстик шага -->
     <div class="card">
       <div class="card-title">
         <span>СИСТЕМНАЯ ПОДМЕНА GPS (БЕЗ ROOT)</span>
         <span id="mockStateText" style="color:var(--dim);">ВЫКЛ</span>
       </div>
-      <div class="row"><span class="lbl">ВЫБРАННЫЙ ОБЪЕКТ:</span><span class="val" id="selectedAddr">Нажмите на любую точку карты</span></div>
-      <div class="grid-2" style="margin-top:8px;">
+      <div class="row"><span class="lbl">ОБЪЕКТ:</span><span class="val" id="selectedAddr">Нажмите на любую точку карты</span></div>
+
+      <div class="btn-row" style="margin-top:6px;">
+        <div class="chip" onclick="setQuickPreset(55.75582, 37.61730, 'Москва, Кремль')">МОСКВА</div>
+        <div class="chip" onclick="setQuickPreset(59.93863, 30.31413, 'Санкт-Петербург')">СПБ</div>
+        <div class="chip" onclick="setQuickPreset(38.87185, -77.05626, 'Пентагон, США')">ПЕНТАГОН</div>
+        <div class="chip" onclick="setQuickPreset(25.19719, 55.27437, 'Дубай, Бурдж-Халифа')">ДУБАЙ</div>
+      </div>
+
+      <div class="grid-2" style="margin-top:6px;">
         <div>
-          <span class="lbl" style="font-size:10px;">ШИРОТА (LAT):</span>
+          <span class="lbl" style="font-size:9px;">ШИРОТА (LAT):</span>
           <input type="number" id="fakeLat" step="0.00001" value="55.75582">
         </div>
         <div>
-          <span class="lbl" style="font-size:10px;">ДОЛГОТА (LON):</span>
+          <span class="lbl" style="font-size:9px;">ДОЛГОТА (LON):</span>
           <input type="number" id="fakeLon" step="0.00001" value="37.61730">
         </div>
       </div>
       <div class="grid-2">
         <div>
-          <span class="lbl" style="font-size:10px;">ВЫСОТА (М):</span>
-          <input type="number" id="fakeAlt" value="160">
+          <span class="lbl" style="font-size:9px;">ВЫСОТА (М):</span>
+          <input type="number" id="fakeAlt" value="158">
         </div>
         <div>
-          <span class="lbl" style="font-size:10px;">СКОРОСТЬ (КМ/Ч):</span>
-          <input type="number" id="fakeSpeed" value="0">
+          <span class="lbl" style="font-size:9px;">СКОРОСТЬ (КМ/Ч):</span>
+          <input type="number" id="fakeSpeed" value="15">
         </div>
       </div>
+
+      <!-- Тактический джойстик смещения точки -->
+      <div class="grid-3" style="margin-bottom:8px;">
+        <button class="btn" onclick="nudgeGps(0.00025, 0)">⬆️ СЕВЕР</button>
+        <button class="btn" onclick="nudgeGps(-0.00025, 0)">⬇️ ЮГ</button>
+        <button class="btn" onclick="nudgeGps(0, 0.00035)">➡️ ВОСТОК</button>
+      </div>
+
       <div class="grid-2" style="margin-bottom:8px;">
         <label style="font-size:11px; font-family:var(--mono); display:flex; align-items:center; gap:6px;">
           <input type="checkbox" id="fakeJitter" checked style="width:16px; height:16px; margin:0;"> Дрейф ±1.5м
         </label>
         <label style="font-size:11px; font-family:var(--mono); display:flex; align-items:center; gap:6px;">
-          <input type="checkbox" id="fakeMove" style="width:16px; height:16px; margin:0;"> Движение по курсу
+          <input type="checkbox" id="fakeMove" style="width:16px; height:16px; margin:0;"> Авто-движение
         </label>
       </div>
+
       <div class="grid-2">
         <button class="btn green" onclick="enableFakeGps()">ВКЛЮЧИТЬ FAKE GPS</button>
         <button class="btn red" onclick="disableFakeGps()">ОТКЛЮЧИТЬ</button>
       </div>
-      <button class="btn yellow" style="margin-top:8px;" onclick="openDevOpts()">⚙️ ВЫБРАТЬ «КОНТУР-М» В НАСТРОЙКАХ РАЗРАБОТЧИКА</button>
-      <div class="term" id="mapLog">Нажмите на любой дом или улицу на карте, чтобы захватить координаты для подмены GPS.</div>
+      <button class="btn yellow" style="margin-top:7px;" onclick="openDevOpts()">⚙️ ВЫБРАТЬ «КОНТУР-М» В НАСТРОЙКАХ РАЗРАБОТЧИКА</button>
+      <div class="term" id="mapLog">Карта работает без API-токенов. Нажмите на любой дом или улицу для захвата координат.</div>
     </div>
   </div>
 
-  <!-- ВКЛАДКА 2: TG PROXY + YOUTUBE / ПРИЛОЖЕНИЯ (VPN SPLIT) -->
+  <!-- ВКЛАДКА 2: КИБЕРРАЗВЕДКА (SHODAN, ПОРТЫ, ДОМЕНЫ, ТЕЛЕФОН, MAC) -->
+  <div id="tab-osint" class="screen">
+    <!-- 1. SHODAN INTERNETDB + BGP + TCP PORT SCANNER -->
+    <div class="card">
+      <div class="card-title">🔥 SHODAN INTERNETDB + СКАНЕР ПОРТОВ И CVE</div>
+      <input type="text" id="shodanInput" placeholder="IP или Домен (например: 1.1.1.1, yandex.ru, scanme.nmap.org)">
+      <div class="grid-2">
+        <button class="btn green" onclick="runShodanRecon()">🔍 ПРОБИВ SHODAN + BGP</button>
+        <button class="btn yellow" onclick="runNativePortScan()">⚡ НАТИВНЫЙ TCP-СКАН</button>
+      </div>
+      <div class="term" id="shodanLog">Подключено к базе Shodan InternetDB и нативному сокет-сканеру Android.</div>
+    </div>
+
+    <!-- 2. ПЕРЕХВАТ СУБДОМЕНОВ (CRT.SH) И DNS-OVER-HTTPS -->
+    <div class="card">
+      <div class="card-title">🌐 РАЗВЕДКА ДОМЕНОВ (SSL CRT.SH + DoH DNS)</div>
+      <input type="text" id="domainInput" placeholder="Введите домен (например: goskatalog.ru, vk.com)">
+      <div class="grid-2">
+        <button class="btn" onclick="runSubdomainRecon()">📜 ПОИСК СУБДОМЕНОВ</button>
+        <button class="btn purple" onclick="runFullDnsRecon()">📡 ДАМП ВСЕХ ЗАПИСЕЙ DNS</button>
+      </div>
+      <div class="term" id="domainLog">Готов к сканированию логов прозрачности SSL-сертификатов.</div>
+    </div>
+
+    <!-- 3. ПОИСК ПО НИКНЕЙМУ / НОМЕРУ ТЕЛЕФОНА / MAC-АДРЕСУ -->
+    <div class="card">
+      <div class="card-title">🕵️‍♂️ OSINT ПРОБИВ: НИКНЕЙМ / ТЕЛЕФОН / MAC</div>
+      <input type="text" id="osintQuery" placeholder="Никнейм (durov), Телефон (+7999...) или MAC (00:1A:2B...)">
+      <div class="grid-3">
+        <button class="btn green" onclick="checkUsernameOsint()">👤 НИКНЕЙМ</button>
+        <button class="btn yellow" onclick="checkPhoneOsint()">📱 ТЕЛЕФОН</button>
+        <button class="btn" onclick="checkMacVendor()">🖧 MAC OUI</button>
+      </div>
+      <div class="term" id="osintLog">Введите цель и выберите тип проверки.</div>
+    </div>
+  </div>
+
+  <!-- ВКЛАДКА 3: ПРОКСИ TG + YOUTUBE / VPN ПРИЛОЖЕНИЙ -->
   <div id="tab-net" class="screen">
     <div class="card">
-      <div class="card-title">TELEGRAM ПРОКСИ (MTPROTO / SOCKS5 ДЛЯ РФ)</div>
+      <div class="card-title">TELEGRAM ПРОКСИ ДЛЯ РФ (MTPROTO / SOCKS5)</div>
       <button class="btn green" onclick="loadLiveTgProxies()" style="margin-bottom:8px;">🔄 ЗАГРУЗИТЬ РАБОЧИЕ ПРОКСИ TELEGRAM</button>
-      <div id="tgProxyList" style="max-height:170px; overflow-y:auto; margin-bottom:8px;"></div>
-      <div class="card-title" style="margin-top:6px;">РУЧНОЙ КОНСТРУКТОР MTPROTO / SOCKS5</div>
+      <div id="tgProxyList" style="max-height:175px; overflow-y:auto; margin-bottom:8px;"></div>
+
+      <div class="card-title" style="margin-top:6px;">РУЧНОЙ КОНСТРУКТОР ПРОКСИ TG</div>
       <div class="grid-2">
         <input type="text" id="tgHost" placeholder="IP / Домен прокси">
         <input type="number" id="tgPort" placeholder="Порт (443 / 1080)" value="443">
       </div>
-      <input type="text" id="tgSecret" placeholder="Secret (для MTProto) или пусто для SOCKS5">
+      <input type="text" id="tgSecret" placeholder="Secret (для MTProto) или оставьте пустым для SOCKS5">
       <div class="grid-2">
         <button class="btn" onclick="connectCustomTgProxy()">ПОДКЛЮЧИТЬ В TG</button>
         <button class="btn yellow" onclick="copyCustomTgLink()">📋 СКОПИРОВАТЬ ССЫЛКУ</button>
@@ -220,46 +332,46 @@
 
     <div class="card">
       <div class="card-title">
-        <span>КОНТУР-VPN // ПРИЛОЖЕНИЯ И YOUTUBE</span>
+        <span>КОНТУР-VPN // YOUTUBE И ПРИЛОЖЕНИЯ</span>
         <span id="vpnBadge" style="color:var(--dim);">ВЫКЛ</span>
       </div>
       <div style="display:flex; gap:6px; margin-bottom:8px;">
         <input type="text" id="appSearch" placeholder="Фильтр приложений (YouTube, Telegram...)" oninput="renderAppList()" style="margin-bottom:0;">
-        <button class="btn" style="width:110px;" onclick="loadInstalledApps()">ОБНОВИТЬ</button>
+        <button class="btn" style="width:105px;" onclick="loadInstalledApps()">ОБНОВИТЬ</button>
       </div>
       <div class="btn-row">
         <div class="chip" onclick="quickSelectApps('youtube')">+ YOUTUBE</div>
         <div class="chip" onclick="quickSelectApps('telegram')">+ TELEGRAM</div>
         <div class="chip" onclick="quickSelectApps('chrome')">+ БРАУЗЕРЫ</div>
       </div>
-      <div class="app-list" id="installedAppsBox">Нажмите «ОБНОВИТЬ» для сканирования установленных приложений телефона...</div>
+      <div class="app-list" id="installedAppsBox">Нажмите «ОБНОВИТЬ» для вывода всех установленных приложений телефона...</div>
       <select id="vpnDnsSelect">
-        <option value="1.1.1.1">Cloudflare DNS (1.1.1.1) + MTU 1280 (Рекомендуется)</option>
+        <option value="1.1.1.1">Cloudflare DNS (1.1.1.1) + MTU 1280 (Обход фрагментации)</option>
         <option value="8.8.8.8">Google Public DNS (8.8.8.8) + MTU 1280</option>
         <option value="9.9.9.9">Quad9 Security DNS (9.9.9.9) + MTU 1280</option>
       </select>
       <div class="grid-2">
-        <button class="btn green" onclick="startSplitVpn(true)">ВКЛЮЧИТЬ СПЕЦТУННЕЛЬ</button>
+        <button class="btn green" onclick="startSplitVpn(true)">ВКЛЮЧИТЬ ТУННЕЛЬ</button>
         <button class="btn red" onclick="startSplitVpn(false)">ВЫКЛЮЧИТЬ</button>
       </div>
     </div>
   </div>
 
-  <!-- ВКЛАДКА 3: СПЕЦ-КАМЕРА С GPS-ШТАМПОМ В ГАЛЕРЕЮ -->
+  <!-- ВКЛАДКА 4: СПЕЦ-ФОТО С GPS ШТАМПОМ В ГАЛЕРЕЮ -->
   <div id="tab-cam" class="screen">
     <div class="card">
-      <div class="card-title">СПЕЦ-ФОТО С ОТМЕТКОЙ GPS (ШТАМП СПРАВА СНИЗУ)</div>
+      <div class="card-title">СПЕЦ-КАМЕРА С ОТМЕТКОЙ GPS СПРАВА СНИЗУ</div>
       <div id="camPreviewBox">
         <video id="camVideo" autoplay playsinline muted></video>
       </div>
       <div class="grid-2" style="margin-bottom:8px;">
-        <button class="btn" onclick="startCamera()">🎥 ВКЛ. КАМЕРУ</button>
-        <button class="btn yellow" onclick="document.getElementById('filePhotoPicker').click()">📂 ВЫБРАТЬ КАДР / КАМЕРУ</button>
+        <button class="btn" onclick="startCamera()">🎥 ВИДОИСКАТЕЛЬ</button>
+        <button class="btn yellow" onclick="document.getElementById('filePhotoPicker').click()">📂 КАМЕРА / ИЗ ФАЙЛА</button>
       </div>
       <input type="file" id="filePhotoPicker" accept="image/*" capture="environment" style="display:none;" onchange="handleFilePhoto(event)">
 
-      <input type="text" id="stampCallsign" value="КОНТУР-М // ОПЕРАТИВНЫЙ КОНТРОЛЬ" placeholder="Подпись / Позывной на штампе">
-      <input type="text" id="stampCustomAddr" placeholder="Адрес (оставьте пустым для авто-адреса с карты)">
+      <input type="text" id="stampCallsign" value="КОНТУР-М // ОПЕРАТИВНАЯ СЪЕМКА" placeholder="Позывной / Отдел на штампе">
+      <input type="text" id="stampCustomAddr" placeholder="Адрес (пусто = автоматически с выбранной точки карты)">
 
       <button class="btn green" onclick="captureWithGpsStamp()">📸 СДЕЛАТЬ СНИМОК СО ШТАМПОМ GPS</button>
 
@@ -267,16 +379,17 @@
 
       <div class="grid-2" id="photoActions" style="display:none; margin-top:8px;">
         <button class="btn green" onclick="saveCurrentPhoto(false)">💾 СОХРАНИТЬ В ГАЛЕРЕЮ</button>
-        <button class="btn yellow" onclick="saveCurrentPhoto(true)">📤 ОТПРАВИТЬ ФОТО</button>
+        <button class="btn yellow" onclick="saveCurrentPhoto(true)">📤 СОХРАНИТЬ И ОТПРАВИТЬ</button>
       </div>
     </div>
   </div>
 
-  <!-- ВКЛАДКА 4: ШИФРАТОР + КОПИРОВАНИЕ/ВСТАВКА + СПУФИНГ БЕЗ ROOT -->
+  <!-- ВКЛАДКА 5: КРИПТО, СТЕГАНОГРАФИЯ, НАСТРОЙКА ПИН/ОТПЕЧАТКА, СПУФИНГ -->
   <div id="tab-crypto" class="screen">
+    <!-- Шифратор AES-GCM-256 -->
     <div class="card">
       <div class="card-title">ШИФРОВАНИЕ РАДИОГРАММ AES-GCM-256</div>
-      <textarea id="cryptoInput" rows="3" placeholder="Введите открытый текст или вставьте шифротекст (IV:DATA)"></textarea>
+      <textarea id="cryptoInput" rows="3" placeholder="Введите открытый текст или шифротекст (IV:DATA)"></textarea>
       <div class="grid-2" style="margin-bottom:8px;">
         <button class="btn" onclick="pasteToField('cryptoInput')">📥 ВСТАВИТЬ ИЗ БУФЕРА</button>
         <button class="btn red" onclick="document.getElementById('cryptoInput').value=''">✖ ОЧИСТИТЬ</button>
@@ -289,134 +402,301 @@
       <div class="term" id="cryptoOutput">Ожидание криптографической операции...</div>
       <div class="grid-2" style="margin-top:8px;">
         <button class="btn" onclick="copyFromTerm('cryptoOutput')">📋 КОПИРОВАТЬ РЕЗУЛЬТАТ</button>
-        <button class="btn yellow" onclick="moveResultToInput()">⬆️ ПЕРЕНЕСТИ В ПОЛЕ ВВОДА</button>
+        <button class="btn yellow" onclick="moveResultToInput()">⬆️ ПЕРЕНЕСТИ В ВВОД</button>
       </div>
     </div>
 
+    <!-- Невидимая стеганография Zero-Width -->
     <div class="card">
-      <div class="card-title">ПОДМЕНА ЦИФРОВОГО ОТПЕЧАТКА (БЕЗ ROOT) & СПЕЦСРЕДСТВА</div>
-      <select id="uaSelect" onchange="applyUserAgent(this.value)">
-        <option value="">-- Выберите маскировку устройства (User-Agent) --</option>
-        <option value="Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1">Apple iPhone 16 Pro (iOS 18)</option>
-        <option value="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36">Windows 11 Enterprise (Chrome 131)</option>
-        <option value="Mozilla/5.0 (X11; Linux x86_64; rv:128.0) Gecko/20100101 Firefox/128.0">Linux Tails / Tor Browser (x86_64)</option>
-      </select>
+      <div class="card-title">👻 СТЕГАНОГРАФИЯ (СКРЫТЫЙ ТЕКСТ-НЕВИДИМКА)</div>
+      <input type="text" id="stegoCover" value="Привет! Завтра созвонимся по проекту." placeholder="Видимый обычный текст (прикрытие)">
+      <input type="text" id="stegoSecret" placeholder="Секретное сообщение (спрячется внутри обычного)">
       <div class="grid-2">
-        <button class="btn yellow" id="jammerBtn" onclick="toggleAcousticJammer()">🔊 АКУСТИЧЕСКИЙ ЩИТ (ШУМ)</button>
-        <button class="btn" onclick="checkPasswordLeakPrompt()">🔑 АУДИТ УТЕЧКИ ПАРОЛЯ</button>
+        <button class="btn purple" onclick="encodeZeroWidth()">СПРЯТАТЬ И СКОПИРОВАТЬ</button>
+        <button class="btn green" onclick="decodeZeroWidthFromClipboard()">ИЗВЛЕЧЬ ИЗ БУФЕРА</button>
       </div>
-      <div class="term" id="spoofLog">Системные модули маскировки готовы.</div>
+      <div class="term" id="stegoLog">Позволяет прятать невидимый текст внутри обычных сообщений для Telegram/VK.</div>
+    </div>
+
+    <!-- Настройки ПИН-кода, Биометрии и Аппаратной разведки -->
+    <div class="card">
+      <div class="card-title">🔐 БЕЗОПАСНОСТЬ ВХОДА (ПИН + ОТПЕЧАТОК ПАЛЬЦА)</div>
+      <div class="grid-2">
+        <input type="number" id="newPinInput" placeholder="Новый ПИН (4 цифры)">
+        <input type="number" id="duressPinInput" placeholder="Ложный ПИН (тревога)">
+      </div>
+      <div class="grid-2">
+        <button class="btn green" onclick="saveSecurityPins()">💾 СОХРАНИТЬ ПИН-КОДЫ</button>
+        <button class="btn yellow" onclick="lockTerminalNow()">🔒 ЗАБЛОКИРОВАТЬ СЕЙЧАС</button>
+      </div>
+    </div>
+
+    <!-- Спецсредства и криминалистика -->
+    <div class="card">
+      <div class="card-title">СПЕЦСРЕДСТВА & АППАРАТНЫЙ ОТПЕЧАТОК</div>
+      <select id="uaSelect" onchange="applyUserAgent(this.value)">
+        <option value="">-- Смена маскировки User-Agent (Без Root) --</option>
+        <option value="Mozilla/5.0 (iPhone; CPU iPhone OS 18_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.1 Mobile/15E148 Safari/604.1">Apple iPhone 16 Pro Max (iOS 18.1)</option>
+        <option value="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36">Windows 11 Pro x64</option>
+        <option value="Mozilla/5.0 (X11; Linux x86_64; rv:128.0) Gecko/20100101 Firefox/128.0">Tails OS / Tor Linux</option>
+      </select>
+      <div class="grid-2" style="margin-bottom:7px;">
+        <button class="btn yellow" id="jammerBtn" onclick="toggleAcousticJammer()">🔊 АКУСТИЧЕСКИЙ ЩИТ</button>
+        <button class="btn" onclick="checkPasswordLeakPrompt()">🔑 УТЕЧКИ ПАРОЛЕЙ HIBP</button>
+      </div>
+      <div class="grid-2">
+        <button class="btn" onclick="dumpHardwareForensics()">📱 ДАМП ЖЕЛЕЗА И WI-FI</button>
+        <button class="btn red" onclick="panicWipe()">🔥 ЭКСТРЕННЫЙ СБРОС</button>
+      </div>
+      <div class="term" id="spoofLog">Все модули готовы к работе.</div>
     </div>
   </div>
 
-  <!-- НИЖНЯЯ НАВИГАЦИЯ -->
+  <!-- НИЖНЯЯ НАВИГАЦИЯ (5 ВКЛАДОК) -->
   <nav class="bottom-bar">
     <div class="nav-btn active" onclick="switchTab('map', this)">
-      <svg viewBox="0 0 24 24"><path d="M20.5 3l-.16.03L15 5.1 9 3 3.36 4.9c-.21.07-.36.25-.36.48V20.5c0 .28.22.5.5.5l.16-.03L9 18.9l6 2.1 5.64-1.9c.21-.07.36-.25.36-.48V3.5c0-.28-.22-.5-.5-.5zM15 19l-6-2.11V5l6 2.11V19z"/></svg>
-      КАРТА / GPS
+      <svg viewBox="0 0 24 24"><path d="M20.5 3l-.16.03L15 5.1 9 3 3.36 4.9c-.21.07-.36.25-.36.48V20.5c0 .28.22.5.5.5l.16-.03L9 18.9l6 2.1 5.64-1.9c.21-.07-.36-.25.36-.48V3.5c0-.28-.22-.5-.5-.5zM15 19l-6-2.11V5l6 2.11V19z"/></svg>
+      КАРТА/GPS
+    </div>
+    <div class="nav-btn" onclick="switchTab('osint', this)">
+      <svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0016 9.5 6.5 6.5 0 109.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+      РАЗВЕДКА
     </div>
     <div class="nav-btn" onclick="switchTab('net', this)">
       <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg>
-      ПРОКСИ / VPN
+      ПРОКСИ/VPN
     </div>
     <div class="nav-btn" onclick="switchTab('cam', this)">
-      <svg viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+      <svg viewBox="0 0 24 24"><path d="M4 4h3l2-2h6l2 2h3a2 2 0 012 2v12a2 2 0 01-2 2H4a2 2 0 01-2-2V6a2 2 0 012-2zm8 3a5 5 0 100 10 5 5 0 000-10z"/></svg>
       СПЕЦ-ФОТО
     </div>
     <div class="nav-btn" onclick="switchTab('crypto', this)">
-      <svg viewBox="0 0 24 24"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></svg>
-      КРИПТО / СПУФ
+      <svg viewBox="0 0 24 24"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2z"/></svg>
+      КРИПТО/ПИН
     </div>
   </nav>
 
   <script>
-    // Навигация
+    // ==========================================
+    // 0. СИСТЕМА БИОМЕТРИИ И ПИН-КОДА ПРИ ВХОДЕ
+    // ==========================================
+    let currentPinAttempt = "";
+    function getSavedPin() { return localStorage.getItem('kontur_pin') || '0000'; }
+    function getDuressPin() { return localStorage.getItem('kontur_duress') || '9999'; }
+
+    function pressPin(digit) {
+      if (window.AndroidBridge) window.AndroidBridge.vibrate(18);
+      if (currentPinAttempt.length >= 4) return;
+      currentPinAttempt += digit;
+      updatePinDots(false);
+
+      if (currentPinAttempt.length === 4) {
+        if (currentPinAttempt === getSavedPin()) {
+          unlockTerminal(false);
+        } else if (currentPinAttempt === getDuressPin()) {
+          unlockTerminal(true); // Ложный ПИН под принуждением
+        } else {
+          if (window.AndroidBridge) window.AndroidBridge.vibrate(160);
+          updatePinDots(true);
+          document.getElementById('lockMsg').innerText = "ОШИБКА ДОСТУПА: НЕВЕРНЫЙ ПИН-КОД";
+          setTimeout(() => {
+            currentPinAttempt = "";
+            updatePinDots(false);
+          }, 550);
+        }
+      }
+    }
+
+    function clearPin() {
+      currentPinAttempt = currentPinAttempt.slice(0, -1);
+      updatePinDots(false);
+    }
+
+    function updatePinDots(isError) {
+      const dots = document.querySelectorAll('#pinDots .pin-dot');
+      dots.forEach((d, idx) => {
+        d.className = 'pin-dot';
+        if (isError) d.classList.add('error');
+        else if (idx < currentPinAttempt.length) d.classList.add('filled');
+      });
+    }
+
+    function triggerBiometric() {
+      if (window.AndroidBridge) {
+        window.AndroidBridge.authenticateBiometric();
+      } else {
+        unlockTerminal(false);
+      }
+    }
+
+    window.onBiometricSuccess = function() {
+      unlockTerminal(false);
+    };
+    window.onBiometricError = function(msg) {
+      document.getElementById('lockMsg').innerText = msg || "Введите ПИН-код";
+    };
+
+    function unlockTerminal(isDuress) {
+      currentPinAttempt = "";
+      updatePinDots(false);
+      document.getElementById('lockScreen').style.display = 'none';
+      if (isDuress) {
+        document.querySelectorAll('.term').forEach(t => t.innerText = "Система в штатном режиме. Журналы пусты.");
+      }
+      if (map) setTimeout(() => map.invalidateSize(), 150);
+    }
+
+    function lockTerminalNow() {
+      currentPinAttempt = "";
+      updatePinDots(false);
+      document.getElementById('lockMsg').innerText = "ТЕРМИНАЛ ЗАБЛОКИРОВАН";
+      document.getElementById('lockScreen').style.display = 'flex';
+    }
+
+    function saveSecurityPins() {
+      const p1 = document.getElementById('newPinInput').value.trim();
+      const p2 = document.getElementById('duressPinInput').value.trim();
+      if (p1.length === 4) localStorage.setItem('kontur_pin', p1);
+      if (p2.length === 4) localStorage.setItem('kontur_duress', p2);
+      document.getElementById('spoofLog').innerText = `[+] ПИН-коды доступа успешно обновлены! Основной: ${getSavedPin()} | Ложный: ${getDuressPin()}`;
+    }
+
+    // Автоматический вызов сканера отпечатка при открытии приложения
+    window.addEventListener('load', () => {
+      setTimeout(() => {
+        if (window.AndroidBridge) window.AndroidBridge.authenticateBiometric();
+      }, 400);
+    });
+
+    // Счетчик реальных Гц экрана
+    let frameCount = 0, lastFpsTime = performance.now();
+    function measureHz(now) {
+      frameCount++;
+      if (now - lastFpsTime >= 1000) {
+        document.getElementById('fpsBadge').innerText = `${frameCount} HZ`;
+        frameCount = 0;
+        lastFpsTime = now;
+      }
+      requestAnimationFrame(measureHz);
+    }
+    requestAnimationFrame(measureHz);
+
+    // Навигация по вкладкам
     function switchTab(id, el) {
+      if (window.AndroidBridge) window.AndroidBridge.vibrate(12);
       document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
       document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
       document.getElementById('tab-' + id).classList.add('active');
       el.classList.add('active');
-      if (id === 'map' && map) setTimeout(() => map.invalidateSize(), 150);
+      if (id === 'map' && map) setTimeout(() => map.invalidateSize(), 120);
     }
 
-    // Инициализация карты мира
+    // Универсальный HTTP-запрос (сначала через нативный Kotlin-мост без CORS, затем fetch)
+    async function smartFetchJson(url) {
+      if (window.AndroidBridge) {
+        const raw = window.AndroidBridge.httpGet(url);
+        if (raw && !raw.startsWith("ERR:")) {
+          return JSON.parse(raw);
+        }
+      }
+      const res = await fetch(url);
+      return await res.json();
+    }
+
+    // ==========================================
+    // 1. КАРТА МИРА (БЕЗ ТОКЕНОВ), FAKE GPS, САМОЛЕТЫ, ВЫШКИ
+    // ==========================================
     const tiles = {
       dark: L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { maxZoom: 19 }),
       osm: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }),
-      sat: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19 })
+      sat: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19 }),
+      topo: L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', { maxZoom: 17 })
     };
 
-    const map = L.map('map', { zoomControl: true, attributionControl: false }).setView([55.7558, 37.6173], 13);
+    const map = L.map('map', { zoomControl: true, attributionControl: false }).setView([55.75582, 37.61730], 13);
     let currentTile = tiles.dark.addTo(map);
-    let targetMarker = L.marker([55.7558, 37.6173]).addTo(map);
+    let targetMarker = L.marker([55.75582, 37.61730]).addTo(map);
     let planesLayer = L.layerGroup().addTo(map);
     let towersLayer = L.layerGroup().addTo(map);
-    let planesActive = false;
-    let planesTimer = null;
-    let towersActive = false;
+    let planesActive = false, planesTimer = null, towersActive = false;
 
     function setMapLayer(type) {
       map.removeLayer(currentTile);
       currentTile = tiles[type].addTo(map);
-      document.querySelectorAll('.map-Layer-bar .chip').forEach(c => c.classList.remove('active'));
+      ['layerDark', 'layerOsm', 'layerSat', 'layerTopo'].forEach(id => document.getElementById(id).classList.remove('active'));
       if (type === 'dark') document.getElementById('layerDark').classList.add('active');
       if (type === 'osm') document.getElementById('layerOsm').classList.add('active');
       if (type === 'sat') document.getElementById('layerSat').classList.add('active');
+      if (type === 'topo') document.getElementById('layerTopo').classList.add('active');
     }
 
-    // Клик по карте: захват дома/улицы для Fake GPS
     map.on('click', async function(e) {
       const lat = e.latlng.lat.toFixed(6);
       const lon = e.latlng.lng.toFixed(6);
+      setPointAndReverseGeocode(lat, lon);
+    });
+
+    async function setPointAndReverseGeocode(lat, lon) {
       document.getElementById('fakeLat').value = lat;
       document.getElementById('fakeLon').value = lon;
       targetMarker.setLatLng([lat, lon]);
-      document.getElementById('selectedAddr').innerText = `${lat}, ${lon} (определение адреса...)`;
-
+      document.getElementById('selectedAddr').innerText = `${lat}, ${lon}`;
       try {
-        const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&accept-language=ru`);
-        const d = await res.json();
+        const d = await smartFetchJson(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&accept-language=ru`);
         if (d && d.display_name) {
           document.getElementById('selectedAddr').innerText = d.display_name;
           targetMarker.bindPopup(`<b>ТОЧКА ПОДМЕНЫ:</b><br>${d.display_name}`).openPopup();
         }
-      } catch (_) {
-        document.getElementById('selectedAddr').innerText = `${lat}, ${lon}`;
-      }
-    });
+      } catch (_) {}
+    }
 
-    // Поиск любого города, улицы, дома
+    function setQuickPreset(lat, lon, label) {
+      map.setView([lat, lon], 15);
+      targetMarker.setLatLng([lat, lon]);
+      document.getElementById('fakeLat').value = lat;
+      document.getElementById('fakeLon').value = lon;
+      document.getElementById('selectedAddr').innerText = label;
+    }
+
+    function nudgeGps(dLat, dLon) {
+      const lat = (parseFloat(document.getElementById('fakeLat').value) + dLat).toFixed(6);
+      const lon = (parseFloat(document.getElementById('fakeLon').value) + dLon).toFixed(6);
+      document.getElementById('fakeLat').value = lat;
+      document.getElementById('fakeLon').value = lon;
+      targetMarker.setLatLng([lat, lon]);
+      map.panTo([lat, lon]);
+      if (document.getElementById('mockStateText').innerText === "АКТИВЕН") {
+        enableFakeGps();
+      }
+    }
+
     async function searchAddress() {
       const q = document.getElementById('mapSearchInput').value.trim();
       if (!q) return;
       const log = document.getElementById('mapLog');
-      log.innerText = `[+] Поиск объекта: ${q}...`;
+      log.innerText = `[+] Гео-поиск: ${q}...`;
       try {
-        const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&limit=1&accept-language=ru`);
-        const arr = await res.json();
+        const arr = await smartFetchJson(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&limit=1&accept-language=ru`);
         if (arr && arr.length > 0) {
-          const item = arr[0];
-          const lat = parseFloat(item.lat);
-          const lon = parseFloat(item.lon);
+          const lat = parseFloat(arr[0].lat), lon = parseFloat(arr[0].lon);
           map.setView([lat, lon], 16);
           targetMarker.setLatLng([lat, lon]);
           document.getElementById('fakeLat').value = lat.toFixed(6);
           document.getElementById('fakeLon').value = lon.toFixed(6);
-          document.getElementById('selectedAddr').innerText = item.display_name;
-          log.innerText = `[OK] Найден объект: ${item.display_name}\nКоординаты: ${lat}, ${lon}`;
+          document.getElementById('selectedAddr').innerText = arr[0].display_name;
+          log.innerText = `[OK] Объект найден: ${arr[0].display_name}`;
         } else {
-          log.innerText = `[-] Объект не найден. Уточните запрос.`;
+          log.innerText = `[-] Адрес не найден.`;
         }
       } catch (e) {
-        log.innerText = `[-] Ошибка геокодера.`;
+        log.innerText = `[-] Ошибка поиска адреса.`;
       }
     }
 
-    // Включение и отключение системного Fake GPS
     function enableFakeGps() {
       const lat = parseFloat(document.getElementById('fakeLat').value);
       const lon = parseFloat(document.getElementById('fakeLon').value);
-      const alt = parseFloat(document.getElementById('fakeAlt').value) || 150;
+      const alt = parseFloat(document.getElementById('fakeAlt').value) || 158;
       const speed = parseFloat(document.getElementById('fakeSpeed').value) || 0;
       const jitter = document.getElementById('fakeJitter').checked;
       const move = document.getElementById('fakeMove').checked;
@@ -428,167 +708,325 @@
           document.getElementById('mockStateText').innerText = "АКТИВЕН";
           document.getElementById('mockStateText').style.color = "var(--green)";
           const badge = document.getElementById('gpsTopBadge');
-          badge.innerText = `FAKE GPS: ${lat.toFixed(3)}, ${lon.toFixed(3)}`;
+          badge.innerText = `FAKE: ${lat.toFixed(3)}, ${lon.toFixed(3)}`;
           badge.classList.add('spoof');
-          log.innerText = `[+] СИСТЕМНАЯ ПОДМЕНА GPS АКТИВИРОВАНА!\n[+] Координаты: ${lat}, ${lon} (Высота: ${alt}м)\n[+] Все приложения телефона теперь видят эту точку.`;
+          log.innerText = `[+] ПОДМЕНА GPS ВКЛЮЧЕНА!\n[+] Координаты: ${lat}, ${lon} (Alt: ${alt}m)\n[+] Все приложения телефона теперь получают эту геопозицию.`;
         } else if (res === "ERR_DEV_SETTINGS") {
-          log.innerText = `[!] ТРЕБУЕТСЯ РАЗРЕШЕНИЕ В НАСТРОЙКАХ РАЗРАБОТЧИКА:\n1. Нажмите жёлтую кнопку ниже.\n2. Найдите пункт «Выбрать приложение для фиктивных местоположений».\n3. Выберите «КОНТУР-М PRO».`;
+          log.innerText = `[!] ВЫБЕРИТЕ ПРИЛОЖЕНИЕ В НАСТРОЙКАХ РАЗРАБОТЧИКА:\nНажмите жёлтую кнопку ниже -> «Выбрать приложение для фиктивных местоположений» -> «КОНТУР-М ФАНТОМ».`;
         } else {
           log.innerText = `[-] Статус: ${res}`;
         }
-      } else {
-        log.innerText = `[!] Мост AndroidBridge доступен только внутри установленного APK.`;
       }
     }
 
     function disableFakeGps() {
-      if (window.AndroidBridge) {
-        window.AndroidBridge.stopFakeGps();
-      }
+      if (window.AndroidBridge) window.AndroidBridge.stopFakeGps();
       document.getElementById('mockStateText').innerText = "ВЫКЛ";
       document.getElementById('mockStateText').style.color = "var(--dim)";
       const badge = document.getElementById('gpsTopBadge');
       badge.innerText = "GPS: ШТАТНЫЙ";
       badge.classList.remove('spoof');
-      document.getElementById('mapLog').innerText = `[*] Подмена GPS остановлена. Возвращён штатный приёмник.`;
+      document.getElementById('mapLog').innerText = `[*] Подмена GPS остановлена. Работает штатный спутниковый приёмник.`;
     }
 
     function openDevOpts() {
       if (window.AndroidBridge) window.AndroidBridge.openDeveloperSettings();
     }
 
-    // САМОЛЁТЫ В РЕАЛЬНОМ ВРЕМЕНИ (ADS-B)
+    // САМОЛЁТЫ В РЕАЛЬНОМ ВРЕМЕНИ (ADS-B LOL + OPENSKY)
     async function togglePlanes() {
       const btn = document.getElementById('btnPlanes');
-      const log = document.getElementById('mapLog');
       planesActive = !planesActive;
       btn.classList.toggle('active', planesActive);
-
       if (!planesActive) {
         clearInterval(planesTimer);
         planesLayer.clearLayers();
-        log.innerText = `[*] Радар самолётов ADS-B отключён.`;
+        document.getElementById('mapLog').innerText = `[*] Радар авиации ADS-B выключен.`;
         return;
       }
-
       await fetchLivePlanes();
-      planesTimer = setInterval(fetchLivePlanes, 10000);
+      planesTimer = setInterval(fetchLivePlanes, 9000);
     }
 
     async function fetchLivePlanes() {
       const log = document.getElementById('mapLog');
-      const center = map.getCenter();
-      const b = map.getBounds();
-      log.innerText = `[+] Запрос воздушной обстановки ADS-B вокруг (${center.lat.toFixed(2)}, ${center.lng.toFixed(2)})...`;
+      const c = map.getCenter();
+      log.innerText = `[+] Пеленгация транспондеров ADS-B вокруг (${c.lat.toFixed(2)}, ${c.lng.toFixed(2)})...`;
 
+      // Источник 1: adsb.lol (без лимитов, радиус 250 морских миль)
       try {
-        // Попытка 1: OpenSky Network по текущему сектору карты
-        const url = `https://opensky-network.org/api/states/all?lamin=${b.getSouth().toFixed(2)}&lomin=${b.getWest().toFixed(2)}&lamax=${b.getNorth().toFixed(2)}&lomax=${b.getEast().toFixed(2)}`;
-        const res = await fetch(url);
-        const data = await res.json();
-        planesLayer.clearLayers();
-
-        if (data && data.states && data.states.length > 0) {
-          data.states.slice(0, 120).forEach(s => {
-            const callsign = (s[1] || 'N/A').trim();
-            const country = s[2] || '';
-            const lon = s[5], lat = s[6];
-            const alt = s[7] ? Math.round(s[7]) : 0;
-            const speedKmh = s[9] ? Math.round(s[9] * 3.6) : 0;
-            const track = s[10] || 0;
-            if (lat && lon) {
+        const data = await smartFetchJson(`https://api.adsb.lol/v2/point/${c.lat.toFixed(3)}/${c.lng.toFixed(3)}/250`);
+        if (data && data.ac && data.ac.length > 0) {
+          planesLayer.clearLayers();
+          data.ac.slice(0, 120).forEach(ac => {
+            if (ac.lat && ac.lon) {
+              const call = (ac.flight || ac.r || 'БОРТ').trim();
+              const model = ac.t || 'Воздушное судно';
+              const altM = ac.alt_baro ? Math.round(Number(ac.alt_baro) * 0.3048) : 0;
+              const spdKmh = ac.gs ? Math.round(Number(ac.gs) * 1.852) : 0;
+              const track = ac.track || 0;
               const icon = L.divIcon({
                 className: '',
-                html: `<div style="transform:rotate(${track}deg); font-size:18px; filter:drop-shadow(0 0 4px #ffb700);">✈️</div>`,
+                html: `<div style="transform:rotate(${track}deg);font-size:18px;filter:drop-shadow(0 0 4px #ffb700);">✈️</div>`,
                 iconSize: [22, 22]
               });
-              L.marker([lat, lon], { icon }).addTo(planesLayer)
-                .bindPopup(`<b>Борт: ${callsign}</b><br>Страна: ${country}<br>Высота: ${alt} м<br>Скорость: ${speedKmh} км/ч<br>Курс: ${Math.round(track)}°`);
+              L.marker([ac.lat, ac.lon], { icon }).addTo(planesLayer)
+                .bindPopup(`<b>✈️ Борт: ${call}</b><br>Тип: ${model}<br>Высота: ${altM} м<br>Скорость: ${spdKmh} км/ч<br>Курс: ${Math.round(track)}°`);
             }
           });
-          log.innerText = `[OK] Обнаружено воздушных судов в секторе: ${data.states.length}`;
+          log.innerText = `[OK] ADS-B Радар: в небе зафиксировано ${data.ac.length} бортов.`;
           return;
         }
-        log.innerText = `[i] В данном секторе активных гражданских транспондеров не зафиксировано (отдалите карту или сместите к крупному авиаузлу).`;
-      } catch (e) {
-        log.innerText = `[-] Узел OpenSky перегружен. Повторите запрос или смените масштаб карты.`;
+      } catch (_) {}
+
+      // Источник 2: OpenSky Network
+      try {
+        const b = map.getBounds();
+        const data2 = await smartFetchJson(`https://opensky-network.org/api/states/all?lamin=${b.getSouth().toFixed(2)}&lomin=${b.getWest().toFixed(2)}&lamax=${b.getNorth().toFixed(2)}&lomax=${b.getEast().toFixed(2)}`);
+        planesLayer.clearLayers();
+        if (data2 && data2.states && data2.states.length > 0) {
+          data2.states.slice(0, 100).forEach(s => {
+            if (s[6] && s[5]) {
+              const track = s[10] || 0;
+              const icon = L.divIcon({
+                className: '',
+                html: `<div style="transform:rotate(${track}deg);font-size:18px;filter:drop-shadow(0 0 4px #ffb700);">✈️</div>`,
+                iconSize: [22, 22]
+              });
+              L.marker([s[6], s[5]], { icon }).addTo(planesLayer)
+                .bindPopup(`<b>✈️ Борт: ${(s[1]||'N/A').trim()}</b><br>Страна: ${s[2]}<br>Высота: ${Math.round(s[7]||0)} м`);
+            }
+          });
+          log.innerText = `[OK] OpenSky Радар: обнаружено ${data2.states.length} бортов.`;
+        } else {
+          log.innerText = `[i] В данном секторе гражданских транспондеров не обнаружено.`;
+        }
+      } catch (_) {
+        log.innerText = `[-] Серверы ADS-B временно не отвечают.`;
       }
     }
 
-    // СОТОВЫЕ ВЫШКИ НА КАРТЕ (Overpass API OpenStreetMap)
+    // СОТОВЫЕ ВЫШКИ НА КАРТЕ И МОДЕМ
     async function toggleCellTowers() {
       const btn = document.getElementById('btnTowers');
       const log = document.getElementById('mapLog');
       towersActive = !towersActive;
       btn.classList.toggle('active', towersActive);
-
       if (!towersActive) {
         towersLayer.clearLayers();
-        log.innerText = `[*] Слой базовых станций скрыт.`;
+        log.innerText = `[*] Слой сотовых вышек скрыт.`;
         return;
       }
-
       const c = map.getCenter();
-      log.innerText = `[+] Сканирование всех вышек связи и радиомачт в радиусе 8 км от (${c.lat.toFixed(3)}, ${c.lng.toFixed(3)})...`;
-      const query = `[out:json][timeout:15];(node["man_made"~"mast|tower|communications_tower"](around:8000,${c.lat},${c.lng});node["tower:type"="communication"](around:8000,${c.lat},${c.lng}););out body 150;`;
-
+      log.innerText = `[+] Поиск базовых станций и радиомачт вокруг (${c.lat.toFixed(3)}, ${c.lng.toFixed(3)})...`;
+      const query = `[out:json][timeout:15];(node["man_made"~"mast|tower|communications_tower"](around:10000,${c.lat},${c.lng});node["tower:type"="communication"](around:10000,${c.lat},${c.lng}););out body 150;`;
       try {
-        const res = await fetch(`https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`);
-        const data = await res.json();
+        const data = await smartFetchJson(`https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`);
         towersLayer.clearLayers();
-
         if (data.elements && data.elements.length > 0) {
           data.elements.forEach(el => {
-            const op = (el.tags && (el.tags.operator || el.tags.name)) || 'Базовая станция связи';
-            const height = (el.tags && el.tags.height) ? `${el.tags.height} м` : 'Н/Д';
+            const op = (el.tags && (el.tags.operator || el.tags.name)) || 'Базовая станция BTS';
             const icon = L.divIcon({
               className: '',
               html: `<div style="width:12px;height:12px;background:#00ff66;border:2px solid #000;border-radius:50%;box-shadow:0 0 8px #00ff66;"></div>`,
               iconSize: [12, 12]
             });
             L.marker([el.lat, el.lon], { icon }).addTo(towersLayer)
-              .bindPopup(`<b>📡 ${op}</b><br>Координаты: ${el.lat.toFixed(5)}, ${el.lon.toFixed(5)}<br>Высота мачты: ${height}`);
+              .bindPopup(`<b>📡 ${op}</b><br>Координаты: ${el.lat.toFixed(5)}, ${el.lon.toFixed(5)}`);
           });
-          log.innerText = `[OK] Найдено и нанесено на карту базовых станций: ${data.elements.length} шт.`;
+          log.innerText = `[OK] На карту нанесено ${data.elements.length} вышек связи.`;
         } else {
-          log.innerText = `[i] В радиусе 8 км размеченных мачт не найдено. Нажмите ещё раз в районе города.`;
+          log.innerText = `[i] Вышек в радиусе 10 км не найдено.`;
         }
       } catch (e) {
-        log.innerText = `[-] Ошибка связи с гео-сервером вышек Overpass.`;
+        log.innerText = `[-] Ошибка запроса к гео-базе вышек.`;
       }
     }
 
-    // Чтение реальных сотовых вышек из модема телефона
     function scanNativeCells() {
       const log = document.getElementById('mapLog');
-      if (!window.AndroidBridge) {
-        log.innerText = `[!] Доступно в APK.`;
-        return;
-      }
-      const raw = window.AndroidBridge.getNativeCellTowers();
-      const cells = JSON.parse(raw || "[]");
+      if (!window.AndroidBridge) return;
+      const cells = JSON.parse(window.AndroidBridge.getNativeCellTowers() || "[]");
       if (cells.length === 0) {
-        log.innerText = `[!] Нет данных от радиомодуля (проверьте, что включена геолокация на телефоне).`;
+        log.innerText = `[!] Нет данных от модема (включите геолокацию на телефоне).`;
         return;
       }
-      log.innerText = `[+] ПЕРЕХВАТ БАЗОВЫХ СТАНЦИЙ РАДИОМОДЕМА (${cells.length} шт.):\n` +
-        cells.map((c, i) => `${i+1}. [${c.type}] CID: ${c.cid} | TAC/LAC: ${c.tac} | PCI: ${c.pci} | Сигнал: ${c.dbm} dBm ${c.registered ? '(АКТИВНАЯ)' : ''}`).join('\n');
+      log.innerText = `[+] РАДИОМОДУЛЬ ТЕЛЕФОНА (${cells.length} базовых станций):\n` +
+        cells.map((c, i) => `${i+1}. [${c.type}] CID:${c.cid} | TAC:${c.tac} | PCI:${c.pci} | ${c.dbm} dBm ${c.registered ? '[АКТИВНА]' : ''}`).join('\n');
     }
 
-    // МОДУЛЬ 2: TELEGRAM ПРОКСИ И СПИСОК ПРИЛОЖЕНИЙ (VPN)
+    // ==========================================
+    // 2. КИБЕРРАЗВЕДКА (SHODAN, TCP СКАНЕР, CRT.SH, OSINT)
+    // ==========================================
+    async function resolveTargetToIp(target) {
+      const clean = target.replace(/^https?:\/\//, '').split('/')[0].trim();
+      if (/^\d{1,3}(\.\d{1,3}){3}$/.test(clean)) return clean;
+      const doh = await smartFetchJson(`https://dns.google/resolve?name=${encodeURIComponent(clean)}&type=A`);
+      if (doh && doh.Answer && doh.Answer.length > 0) {
+        const ipRec = doh.Answer.find(a => a.type === 1);
+        if (ipRec) return ipRec.data;
+      }
+      return clean;
+    }
+
+    async function runShodanRecon() {
+      const rawTarget = document.getElementById('shodanInput').value.trim();
+      const log = document.getElementById('shodanLog');
+      if (!rawTarget) return;
+      log.innerText = `[+] Разрешение цели ${rawTarget} и запрос к Shodan InternetDB...`;
+      try {
+        const ip = await resolveTargetToIp(rawTarget);
+        let out = `[🎯 ЦЕЛЬ]: ${rawTarget} -> IP: ${ip}\n`;
+
+        // Гео и BGP/ASN
+        try {
+          const geo = await smartFetchJson(`https://ipwho.is/${ip}`);
+          if (geo && geo.success !== false) {
+            out += `[🌍 ЛОКАЦИЯ]: ${geo.country || ''}, ${geo.city || ''}\n`;
+            out += `[🏢 ПРОВАЙДЕР / ASN]: ${geo.connection?.isp || ''} (AS${geo.connection?.asn || ''})\n`;
+          }
+        } catch (_) {}
+
+        // Shodan InternetDB
+        const shodan = await smartFetchJson(`https://internetdb.shodan.io/${ip}`);
+        if (shodan) {
+          out += `\n[🔓 ОТКРЫТЫЕ ПОРТЫ SHODAN]: ${(shodan.ports && shodan.ports.length) ? shodan.ports.join(', ') : 'Не обнаружены'}\n`;
+          out += `[🏷️ ХОСТНЕЙМЫ]: ${(shodan.hostnames && shodan.hostnames.length) ? shodan.hostnames.join(', ') : 'Нет'}\n`;
+          out += `[⚙️ СЕРВИСЫ (CPE)]: ${(shodan.cpes && shodan.cpes.length) ? shodan.cpes.join(', ') : 'Нет'}\n`;
+          out += `[⚠️ УЯЗВИМОСТИ (CVE)]: ${(shodan.vulns && shodan.vulns.length) ? shodan.vulns.join(', ') : 'Критичных CVE в открытом индексе нет'}\n`;
+        }
+        log.innerText = out;
+      } catch (e) {
+        log.innerText = `[-] Ошибка опроса Shodan: ${e.message}`;
+      }
+    }
+
+    async function runNativePortScan() {
+      const rawTarget = document.getElementById('shodanInput').value.trim();
+      const log = document.getElementById('shodanLog');
+      if (!rawTarget || !window.AndroidBridge) return;
+      log.innerText = `[+] Запуск нативного TCP сокет-сканера по портам ${rawTarget}...`;
+      setTimeout(async () => {
+        try {
+          const ip = await resolveTargetToIp(rawTarget);
+          const ports = "21,22,23,25,53,80,110,143,443,445,1433,3306,3389,5432,6379,8000,8080,8443";
+          const resRaw = window.AndroidBridge.scanTcpPorts(ip, ports);
+          const openList = JSON.parse(resRaw || "[]");
+          if (openList.length > 0) {
+            log.innerText = `[⚡ НАТИВНЫЙ TCP-СКАН ЗАВЕРШЕН (${ip})]:\n` +
+              openList.map(p => ` -> ПОРТ ${p.port}/TCP : ОТКРЫТ (Пинг: ${p.ms} ms)`).join('\n');
+          } else {
+            log.innerText = `[*] На узле ${ip} стандартные порты закрыты файрволом.`;
+          }
+        } catch (e) {
+          log.innerText = `[-] Ошибка TCP-сканера.`;
+        }
+      }, 80);
+    }
+
+    async function runSubdomainRecon() {
+      const dom = document.getElementById('domainInput').value.trim().replace(/^https?:\/\//, '').split('/')[0];
+      const log = document.getElementById('domainLog');
+      if (!dom) return;
+      log.innerText = `[+] Поиск субдоменов в реестре SSL-сертификатов crt.sh для *.${dom}...`;
+      try {
+        const data = await smartFetchJson(`https://crt.sh/?q=%25.${encodeURIComponent(dom)}&output=json`);
+        if (Array.isArray(data) && data.length > 0) {
+          const subs = [...new Set(data.map(i => i.name_value).join('\n').split('\n'))].slice(0, 60);
+          log.innerText = `[+] НАЙДЕНО УНИКАЛЬНЫХ СУБДОМЕНОВ (${subs.length}):\n` + subs.map(s => ` • ${s}`).join('\n');
+        } else {
+          log.innerText = `[i] Записей в crt.sh не найдено.`;
+        }
+      } catch (e) {
+        log.innerText = `[-] Сервер crt.sh перегружен, попробуйте ДАМП DNS.`;
+      }
+    }
+
+    async function runFullDnsRecon() {
+      const dom = document.getElementById('domainInput').value.trim().replace(/^https?:\/\//, '').split('/')[0];
+      const log = document.getElementById('domainLog');
+      if (!dom) return;
+      log.innerText = `[+] Опрос глобальных DNS-over-HTTPS для ${dom}...\n`;
+      const types = ['A', 'AAAA', 'MX', 'NS', 'TXT'];
+      for (const t of types) {
+        try {
+          const d = await smartFetchJson(`https://dns.google/resolve?name=${encodeURIComponent(dom)}&type=${t}`);
+          if (d && d.Answer) {
+            log.innerText += `\n[${t}]:\n` + d.Answer.map(a => ` -> ${a.data} (TTL:${a.TTL})`).join('\n');
+          }
+        } catch (_) {}
+      }
+    }
+
+    async function checkUsernameOsint() {
+      const user = document.getElementById('osintQuery').value.trim().replace(/^@/, '');
+      const log = document.getElementById('osintLog');
+      if (!user) return;
+      log.innerText = `[+] OSINT-пробив никнейма "${user}" по открытым API...\n`;
+      try {
+        const gh = await smartFetchJson(`https://api.github.com/users/${encodeURIComponent(user)}`);
+        if (gh && gh.login) {
+          log.innerText += `\n[✅ GITHUB]: Найден! Имя: ${gh.name || 'Н/Д'} | Репозиториев: ${gh.public_repos} | Подписчиков: ${gh.followers} | Создан: ${gh.created_at}`;
+        } else {
+          log.innerText += `\n[❌ GITHUB]: Не найден`;
+        }
+      } catch (_) {}
+
+      try {
+        const gl = await smartFetchJson(`https://gitlab.com/api/v4/users?username=${encodeURIComponent(user)}`);
+        if (Array.isArray(gl) && gl.length > 0) {
+          log.innerText += `\n[✅ GITLAB]: Найден! ID: ${gl[0].id} | Имя: ${gl[0].name} | URL: ${gl[0].web_url}`;
+        }
+      } catch (_) {}
+
+      log.innerText += `\n\n[🔗 ПРЯМЫЕ OSINT-ВЕКТОРЫ]:\n • Telegram: https://t.me/${user}\n • VK: https://vk.com/${user}\n • Habr: https://habr.com/ru/users/${user}/`;
+    }
+
+    function checkPhoneOsint() {
+      const raw = document.getElementById('osintQuery').value.trim();
+      const digits = raw.replace(/\D/g, '');
+      const log = document.getElementById('osintLog');
+      if (digits.length < 7) { log.innerText = "Введите номер телефона в международном формате (+7999...)"; return; }
+
+      let country = "Международный узел";
+      if (digits.startsWith("79")) country = "Россия (Мобильный федеральный DEF-код)";
+      else if (digits.startsWith("7")) country = "Россия / Казахстан (+7)";
+      else if (digits.startsWith("375")) country = "Беларусь (+375)";
+      else if (digits.startsWith("1")) country = "США / Канада (+1)";
+
+      log.innerText = `[📱 АНАЛИЗ НОМЕРА]: +${digits}\n[ЛОКАЦИЯ ПУЛА]: ${country}\n[ПРЯМЫЕ ССЫЛКИ ПРОВЕРКИ МЕССЕНДЖЕРОВ]:\n -> Telegram: tg://resolve?phone=${digits}\n -> WhatsApp: https://wa.me/${digits}\n -> Google Dork: "${digits}" OR "+${digits}"`;
+      if (window.AndroidBridge) {
+        // Копируем ссылку для удобства
+        window.AndroidBridge.copyToClipboard(`https://t.me/+${digits}`);
+      }
+    }
+
+    async function checkMacVendor() {
+      const mac = document.getElementById('osintQuery').value.trim();
+      const log = document.getElementById('osintLog');
+      if (!mac) return;
+      log.innerText = `[+] Поиск производителя оборудования по MAC OUI: ${mac}...`;
+      if (window.AndroidBridge) {
+        const vendor = window.AndroidBridge.httpGet(`https://api.macvendors.com/${encodeURIComponent(mac)}`);
+        log.innerText = `[🖧 ПРОИЗВОДИТЕЛЬ СЕТЕВОЙ КАРТЫ]:\n${vendor}`;
+      }
+    }
+
+    // ==========================================
+    // 3. TELEGRAM ПРОКСИ И SPLIT-VPN ПРИЛОЖЕНИЙ
+    // ==========================================
     async function loadLiveTgProxies() {
       const box = document.getElementById('tgProxyList');
-      box.innerHTML = `<div class="term">Запрос открытых реестров MTProto / SOCKS5...</div>`;
+      box.innerHTML = `<div class="term">Запрос рабочих прокси MTProto / SOCKS5...</div>`;
       try {
-        const res = await fetch('https://mtpro.xyz/api/?type=mtproto');
-        const list = await res.json();
+        const list = await smartFetchJson('https://mtpro.xyz/api/?type=mtproto');
         if (Array.isArray(list) && list.length > 0) {
-          box.innerHTML = list.slice(0, 12).map(p => {
+          box.innerHTML = list.slice(0, 14).map(p => {
             const link = `tg://proxy?server=${p.host}&port=${p.port}&secret=${p.secret}`;
             return `<div class="app-item">
-              <div><b>${p.host}:${p.port}</b> <span style="color:var(--green);">[${p.country || 'RU/EU'} | Пинг: ${p.ping || 'OK'}]</span></div>
+              <div><b>${p.host}:${p.port}</b> <span style="color:var(--green);">[${p.country || 'MTProto'} | ${p.ping || 'OK'} ms]</span></div>
               <div style="display:flex;gap:4px;">
-                <button class="btn green" style="width:auto;padding:5px 8px;" onclick="openTg('${link}')">ВКЛ</button>
+                <button class="btn green" style="width:auto;padding:5px 8px;" onclick="openExt('${link}')">ВКЛ</button>
                 <button class="btn" style="width:auto;padding:5px 8px;" onclick="copyText('${link}')">📋</button>
               </div>
             </div>`;
@@ -597,28 +1035,26 @@
         }
       } catch (_) {}
 
-      // Резервный список SOCKS5
       try {
-        const res2 = await fetch('https://raw.githubusercontent.com/hookzof/socks5_list/master/tg/mtproto.json');
-        const list2 = await res2.json();
-        box.innerHTML = list2.slice(0, 12).map(p => {
+        const list2 = await smartFetchJson('https://raw.githubusercontent.com/hookzof/socks5_list/master/tg/mtproto.json');
+        box.innerHTML = list2.slice(0, 14).map(p => {
           const link = `tg://proxy?server=${p.host}&port=${p.port}&secret=${p.secret}`;
           return `<div class="app-item">
-            <div><b>${p.host}:${p.port}</b> <span style="color:var(--cyan);">[${p.country || 'MTProto'}]</span></div>
+            <div><b>${p.host}:${p.port}</b> <span style="color:var(--cyan);">[${p.country || 'PRO'}]</span></div>
             <div style="display:flex;gap:4px;">
-              <button class="btn green" style="width:auto;padding:5px 8px;" onclick="openTg('${link}')">ВКЛ</button>
+              <button class="btn green" style="width:auto;padding:5px 8px;" onclick="openExt('${link}')">ВКЛ</button>
               <button class="btn" style="width:auto;padding:5px 8px;" onclick="copyText('${link}')">📋</button>
             </div>
           </div>`;
         }).join('');
       } catch (e) {
-        box.innerHTML = `<div class="term">Не удалось загрузить авто-лист. Используйте ручной конструктор ниже.</div>`;
+        box.innerHTML = `<div class="term">Используйте ручной ввод прокси ниже.</div>`;
       }
     }
 
-    function openTg(link) {
-      if (window.AndroidBridge) window.AndroidBridge.openTelegramLink(link);
-      else window.location.href = link;
+    function openExt(url) {
+      if (window.AndroidBridge) window.AndroidBridge.openExternalLink(url);
+      else window.location.href = url;
     }
 
     function buildCustomTgUrl() {
@@ -631,24 +1067,15 @@
         : `tg://socks?server=${encodeURIComponent(host)}&port=${encodeURIComponent(port)}`;
     }
 
-    function connectCustomTgProxy() {
-      const url = buildCustomTgUrl();
-      if (url) openTg(url);
-    }
+    function connectCustomTgProxy() { const u = buildCustomTgUrl(); if (u) openExt(u); }
+    function copyCustomTgLink() { const u = buildCustomTgUrl(); if (u) copyText(u); }
 
-    function copyCustomTgLink() {
-      const url = buildCustomTgUrl();
-      if (url) copyText(url);
-    }
-
-    // Список установленных на телефон приложений
     let allInstalledApps = [];
     let selectedPackages = new Set(['com.google.android.youtube', 'org.telegram.messenger']);
 
     function loadInstalledApps() {
       if (!window.AndroidBridge) return;
-      const raw = window.AndroidBridge.getInstalledApps();
-      allInstalledApps = JSON.parse(raw || "[]");
+      allInstalledApps = JSON.parse(window.AndroidBridge.getInstalledApps() || "[]");
       renderAppList();
     }
 
@@ -657,13 +1084,13 @@
       const filter = document.getElementById('appSearch').value.toLowerCase();
       const filtered = allInstalledApps.filter(a => a.name.toLowerCase().includes(filter) || a.pkg.toLowerCase().includes(filter));
       if (filtered.length === 0) {
-        box.innerHTML = `<div style="padding:8px;color:var(--dim);">Приложения не найдены. Нажмите «ОБНОВИТЬ».</div>`;
+        box.innerHTML = `<div style="padding:8px;color:var(--dim);">Нажмите «ОБНОВИТЬ» для загрузки списка установленных приложений.</div>`;
         return;
       }
       box.innerHTML = filtered.map(a => {
         const checked = selectedPackages.has(a.pkg) ? 'checked' : '';
         return `<div class="app-item">
-          <div style="max-width:75%;overflow:hidden;text-overflow:ellipsis;">
+          <div style="max-width:72%;overflow:hidden;text-overflow:ellipsis;" onclick="window.AndroidBridge.launchApp('${a.pkg}')">
             <b>${a.name}</b><br><span style="color:var(--dim);font-size:9px;">${a.pkg}</span>
           </div>
           <input type="checkbox" ${checked} onchange="togglePkg('${a.pkg}', this.checked)">
@@ -690,18 +1117,15 @@
       if (!window.AndroidBridge) return;
       const dns = document.getElementById('vpnDnsSelect').value;
       const csv = Array.from(selectedPackages).join(',');
-      const res = window.AndroidBridge.toggleVpn(enable, csv, dns);
+      window.AndroidBridge.toggleVpn(enable, csv, dns);
       const badge = document.getElementById('vpnBadge');
-      if (enable) {
-        badge.innerText = "АКТИВЕН (SPLIT-DNS)";
-        badge.style.color = "var(--green)";
-      } else {
-        badge.innerText = "ВЫКЛ";
-        badge.style.color = "var(--dim)";
-      }
+      badge.innerText = enable ? "АКТИВЕН (MTU 1280)" : "ВЫКЛ";
+      badge.style.color = enable ? "var(--green)" : "var(--dim)";
     }
 
-    // МОДУЛЬ 3: ТАКТИЧЕСКАЯ КАМЕРА СО ШТАМПОМ GPS СПРАВА СНИЗУ
+    // ==========================================
+    // 4. СПЕЦ-КАМЕРА С GPS ШТАМПОМ СПРАВА СНИЗУ
+    // ==========================================
     let camStream = null;
     let lastCapturedDataUrl = null;
 
@@ -715,7 +1139,7 @@
         });
         video.srcObject = camStream;
       } catch (e) {
-        alert("Для съёмки нажмите жёлтую кнопку «ВЫБРАТЬ КАДР / КАМЕРУ» или разрешите доступ к камере.");
+        document.getElementById('filePhotoPicker').click();
       }
     }
 
@@ -725,9 +1149,7 @@
       const reader = new FileReader();
       reader.onload = function(ev) {
         const img = new Image();
-        img.onload = function() {
-          drawTacticalStampOnCanvas(img, img.width, img.height);
-        };
+        img.onload = function() { drawTacticalStampOnCanvas(img, img.width, img.height); };
         img.src = ev.target.result;
       };
       reader.readAsDataURL(file);
@@ -749,66 +1171,62 @@
       const ctx = canvas.getContext('2d');
       ctx.drawImage(sourceEl, 0, 0, w, h);
 
-      // Координаты (берутся из текущего поля/Fake GPS)
-      const lat = document.getElementById('fakeLat').value || '55.75580';
+      const lat = document.getElementById('fakeLat').value || '55.75582';
       const lon = document.getElementById('fakeLon').value || '37.61730';
-      const alt = document.getElementById('fakeAlt').value || '160';
-      const callsign = document.getElementById('stampCallsign').value || 'КОНТУР-М // СПЕЦКОНТРОЛЬ';
+      const alt = document.getElementById('fakeAlt').value || '158';
+      const callsign = document.getElementById('stampCallsign').value || 'КОНТУР-М // ОПЕРАТИВНАЯ СЪЕМКА';
       const addr = document.getElementById('stampCustomAddr').value || document.getElementById('selectedAddr').innerText || 'РФ';
       const now = new Date().toLocaleString('ru-RU');
 
-      // Размеры штампа справа снизу
       const scale = Math.max(w, h) / 1200;
-      const boxW = Math.min(w * 0.92, Math.round(520 * scale));
-      const boxH = Math.round(175 * scale);
+      const boxW = Math.min(w * 0.92, Math.round(540 * scale));
+      const boxH = Math.round(180 * scale);
       const pad = Math.round(24 * scale);
       const x = w - boxW - pad;
       const y = h - boxH - pad;
 
-      // Полупрозрачная тактическая подложка
-      ctx.fillStyle = 'rgba(6, 10, 18, 0.82)';
+      ctx.fillStyle = 'rgba(5, 9, 16, 0.85)';
       ctx.fillRect(x, y, boxW, boxH);
       ctx.strokeStyle = '#00f3ff';
       ctx.lineWidth = Math.max(2, Math.round(2.5 * scale));
       ctx.strokeRect(x, y, boxW, boxH);
 
-      // Текст штампа
       ctx.fillStyle = '#00f3ff';
       ctx.font = `bold ${Math.round(20 * scale)}px monospace`;
-      ctx.fillText(`⌖ ${callsign}`, x + 16 * scale, y + 32 * scale);
+      ctx.fillText(`⌖ ${callsign}`, x + 16 * scale, y + 34 * scale);
 
       ctx.fillStyle = '#00ff66';
       ctx.font = `bold ${Math.round(19 * scale)}px monospace`;
-      ctx.fillText(`GPS: ${lat}, ${lon} (ALT: ${alt}m)`, x + 16 * scale, y + 65 * scale);
+      ctx.fillText(`GPS: ${lat}, ${lon} (ALT: ${alt}m)`, x + 16 * scale, y + 68 * scale);
 
       ctx.fillStyle = '#ffffff';
       ctx.font = `${Math.round(17 * scale)}px monospace`;
-      ctx.fillText(`ДАТА: ${now}`, x + 16 * scale, y + 98 * scale);
+      ctx.fillText(`ВРЕМЯ: ${now}`, x + 16 * scale, y + 102 * scale);
 
       const shortAddr = addr.length > 42 ? addr.substring(0, 42) + '...' : addr;
       ctx.fillStyle = '#ffb700';
-      ctx.fillText(`ЛОКАЦИЯ: ${shortAddr}`, x + 16 * scale, y + 132 * scale);
+      ctx.fillText(`АДРЕС: ${shortAddr}`, x + 16 * scale, y + 138 * scale);
 
       canvas.style.display = 'block';
       document.getElementById('photoActions').style.display = 'grid';
-      lastCapturedDataUrl = canvas.toDataURL('image/jpeg', 0.94);
+      lastCapturedDataUrl = canvas.toDataURL('image/jpeg', 0.95);
     }
 
     function saveCurrentPhoto(share) {
-      if (!lastCapturedDataUrl) return;
-      if (window.AndroidBridge) {
-        window.AndroidBridge.savePhotoToGallery(lastCapturedDataUrl, share);
-      }
+      if (!lastCapturedDataUrl || !window.AndroidBridge) return;
+      window.AndroidBridge.savePhotoToGallery(lastCapturedDataUrl, share);
     }
 
-    // МОДУЛЬ 4: БУФЕР ОБМЕНА, КРИПТО И АНТИ-ПРОСЛУШКА
+    // ==========================================
+    // 5. КРИПТО, СТЕГАНОГРАФИЯ И СПЕЦСРЕДСТВА
+    // ==========================================
     function copyText(txt) {
       if (window.AndroidBridge) window.AndroidBridge.copyToClipboard(txt);
       else if (navigator.clipboard) navigator.clipboard.writeText(txt);
     }
 
     function copyFromTerm(id) {
-      const txt = document.getElementById(id).innerText.replace(/^\[.*?\]\s*/gm, '').trim();
+      const txt = document.getElementById(id).innerText.trim();
       copyText(txt);
     }
 
@@ -820,15 +1238,14 @@
     }
 
     function moveResultToInput() {
-      const txt = document.getElementById('cryptoOutput').innerText.replace(/^\[.*?\]\s*/gm, '').trim();
-      document.getElementById('cryptoInput').value = txt;
+      document.getElementById('cryptoInput').value = document.getElementById('cryptoOutput').innerText.trim();
     }
 
     async function runAes(encrypt) {
       const text = document.getElementById('cryptoInput').value.trim();
       const keyStr = document.getElementById('cryptoKey').value;
       const out = document.getElementById('cryptoOutput');
-      if (!text || !keyStr) { out.innerText = '[-] Введите текст и секретный ключ!'; return; }
+      if (!text || !keyStr) { out.innerText = 'Введите текст и секретный ключ!'; return; }
       try {
         const enc = new TextEncoder();
         const keyHash = await crypto.subtle.digest('SHA-256', enc.encode(keyStr));
@@ -836,8 +1253,7 @@
         if (encrypt) {
           const iv = crypto.getRandomValues(new Uint8Array(12));
           const cipher = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, enc.encode(text));
-          const res = btoa(String.fromCharCode(...iv)) + ':' + btoa(String.fromCharCode(...new Uint8Array(cipher)));
-          out.innerText = res;
+          out.innerText = btoa(String.fromCharCode(...iv)) + ':' + btoa(String.fromCharCode(...new Uint8Array(cipher)));
         } else {
           const parts = text.split(':');
           const iv = new Uint8Array(atob(parts[0]).split('').map(c => c.charCodeAt(0)));
@@ -846,26 +1262,57 @@
           out.innerText = new TextDecoder().decode(plain);
         }
       } catch (e) {
-        out.innerText = '[-] Ошибка расшифровки: неверный ключ или повреждённая криптограмма.';
+        out.innerText = 'Ошибка: неверный ключ или поврежденный шифротекст.';
       }
+    }
+
+    // Невидимая стеганография Zero-Width
+    function encodeZeroWidth() {
+      const cover = document.getElementById('stegoCover').value || 'Привет!';
+      const secret = document.getElementById('stegoSecret').value;
+      const log = document.getElementById('stegoLog');
+      if (!secret) { log.innerText = 'Введите секретное сообщение!'; return; }
+
+      const bytes = new TextEncoder().encode(secret);
+      let bin = '';
+      bytes.forEach(b => { bin += b.toString(2).padStart(8, '0'); });
+      const hidden = bin.split('').map(bit => bit === '1' ? '\u200B' : '\u200C').join('') + '\u200D';
+      const result = cover.slice(0, 1) + hidden + cover.slice(1);
+      copyText(result);
+      log.innerText = `[+] Секретное послание вшито внутрь фразы и скопировано в буфер обмена!\nОтправьте его в любой мессенджер — визуально виден только обычный текст.`;
+    }
+
+    function decodeZeroWidthFromClipboard() {
+      const log = document.getElementById('stegoLog');
+      const raw = window.AndroidBridge ? window.AndroidBridge.pasteFromClipboard() : '';
+      if (!raw) { log.innerText = 'Буфер обмена пуст!'; return; }
+      const chars = Array.from(raw).filter(c => c === '\u200B' || c === '\u200C');
+      if (chars.length < 8) { log.innerText = '[-] Скрытых невидимых меток в скопированном тексте не обнаружено.'; return; }
+
+      const bits = chars.map(c => c === '\u200B' ? '1' : '0').join('');
+      const byteArr = [];
+      for (let i = 0; i + 8 <= bits.length; i += 8) {
+        byteArr.push(parseInt(bits.slice(i, i + 8), 2));
+      }
+      const decoded = new TextDecoder().decode(new Uint8Array(byteArr));
+      log.innerText = `[🔓 ОБНАРУЖЕНО СКРЫТОЕ СООБЩЕНИЕ]:\n${decoded}`;
     }
 
     function applyUserAgent(ua) {
       if (!ua) return;
       if (window.AndroidBridge) window.AndroidBridge.setCustomUserAgent(ua);
-      document.getElementById('spoofLog').innerText = `[+] Установлен новый системный User-Agent:\n${ua}`;
+      document.getElementById('spoofLog').innerText = `[+] Активирован новый User-Agent:\n${ua}`;
     }
 
-    // Акустический генератор помех (белый шум + ВЧ против микрофонов)
-    let audioCtx = null, noiseNode = null;
+    let audioCtx = null;
     function toggleAcousticJammer() {
       const btn = document.getElementById('jammerBtn');
       const log = document.getElementById('spoofLog');
       if (audioCtx) {
         audioCtx.close();
         audioCtx = null;
-        btn.innerText = "🔊 АКУСТИЧЕСКИЙ ЩИТ (ШУМ)";
-        log.innerText = "[*] Акустическая постановка помех отключена.";
+        btn.innerText = "🔊 АКУСТИЧЕСКИЙ ЩИТ";
+        log.innerText = "[*] Акустическая помеха отключена.";
         return;
       }
       audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -873,28 +1320,42 @@
       const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
       const data = buffer.getChannelData(0);
       for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
-
-      noiseNode = audioCtx.createBufferSource();
-      noiseNode.buffer = buffer;
-      noiseNode.loop = true;
-      noiseNode.connect(audioCtx.destination);
-      noiseNode.start();
-      btn.innerText = "🛑 ОСТАНОВИТЬ ШУМ";
-      log.innerText = "[+] АКТИВИРОВАН АКУСТИЧЕСКИЙ ЩИТ: генерация широкополосного маскирующего шума против записи речи.";
+      const noise = audioCtx.createBufferSource();
+      noise.buffer = buffer;
+      noise.loop = true;
+      noise.connect(audioCtx.destination);
+      noise.start();
+      btn.innerText = "🛑 ВЫКЛ. ЩИТ";
+      log.innerText = "[+] АКУСТИЧЕСКИЙ ЩИТ ВКЛЮЧЕН: генерация широкополосной помехи.";
     }
 
     async function checkPasswordLeakPrompt() {
-      const pwd = prompt("Введите пароль для безопасной проверки по базе утечек (k-Anonymity):");
+      const pwd = prompt("Введите пароль для проверки по базе утечек HIBP (k-Anonymity):");
       if (!pwd) return;
       const log = document.getElementById('spoofLog');
       const buf = await crypto.subtle.digest('SHA-1', new TextEncoder().encode(pwd));
       const hash = Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('').toUpperCase();
-      const res = await fetch(`https://api.pwnedpasswords.com/range/${hash.slice(0, 5)}`);
-      const text = await res.text();
+      const text = window.AndroidBridge
+        ? window.AndroidBridge.httpGet(`https://api.pwnedpasswords.com/range/${hash.slice(0, 5)}`)
+        : await (await fetch(`https://api.pwnedpasswords.com/range/${hash.slice(0, 5)}`)).text();
       const match = text.split('\n').find(l => l.startsWith(hash.slice(5)));
       log.innerText = match
-        ? `[!] ПАРОЛЬ СКОМПРОМЕТИРОВАН! Найдено в базах утечек: ${match.split(':')[1].trim()} раз.`
-        : `[OK] Пароль чист — не найден ни в одной базе утечек.`;
+        ? `[!] ПАРОЛЬ СКОМПРОМЕТИРОВАН! Найдено в утечках: ${match.split(':')[1].trim()} раз.`
+        : `[OK] Пароль чист — не найден в базах утечек.`;
+    }
+
+    function dumpHardwareForensics() {
+      if (!window.AndroidBridge) return;
+      const d = JSON.parse(window.AndroidBridge.getHardwareForensics() || "{}");
+      document.getElementById('spoofLog').innerText =
+        `[📱 АППАРАТНЫЙ ДАМП УЗЛА]:\nМодель: ${d.model}\nПлата: ${d.board}\nОС: ${d.android} (Патч: ${d.patch})\nАрхитектура: ${d.abis}\nЛокальный IP Wi-Fi: ${d.localIp}\nСигнал Wi-Fi: ${d.rssi} (${d.linkSpeed})`;
+    }
+
+    function panicWipe() {
+      disableFakeGps();
+      document.querySelectorAll('.term').forEach(t => t.innerText = "ОЧИЩЕНО.");
+      document.querySelectorAll('input[type="text"], textarea').forEach(i => i.value = "");
+      lockTerminalNow();
     }
   </script>
 </body>
