@@ -2,47 +2,55 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
-    <!-- Сеть и состояние -->
+    <!-- Сеть и разведка -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
 
-    <!-- Навигация, сотовые вышки и СИСТЕМНАЯ ПОДМЕНА GPS (для Настроек разработчика) -->
+    <!-- Биометрия (Сканер отпечатка пальца) и тактильный отклик -->
+    <uses-permission android:name="android.permission.USE_BIOMETRIC" />
+    <uses-permission android:name="android.permission.USE_FINGERPRINT" />
+    <uses-permission android:name="android.permission.VIBRATE" />
+
+    <!-- Геолокация, вышки связи и системная подмена GPS -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.READ_PHONE_STATE" />
     <uses-permission
         android:name="android.permission.ACCESS_MOCK_LOCATION"
         tools:ignore="MockLocation,ProtectedPermissions" />
 
-    <!-- Камера и сохранение фото в Галерею -->
+    <!-- Спец-камера и сохранение в Галерею -->
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission
         android:name="android.permission.WRITE_EXTERNAL_STORAGE"
         android:maxSdkVersion="28" />
 
-    <!-- Видимость всех установленных приложений (YouTube, Telegram и др.) -->
+    <!-- Сканер установленных приложений для Split-VPN -->
     <uses-permission
         android:name="android.permission.QUERY_ALL_PACKAGES"
         tools:ignore="QueryAllPackagesPermission" />
 
     <application
         android:allowBackup="true"
-        android:label="КОНТУР-М PRO"
-        android:icon="@android:drawable/ic_dialog_map"
+        android:label="КОНТУР-М ФАНТОМ"
+        android:icon="@android:drawable/ic_lock_lock"
         android:supportsRtl="true"
         android:theme="@style/Theme.AppCompat.NoActionBar"
-        android:usesCleartextTraffic="true">
+        android:usesCleartextTraffic="true"
+        android:hardwareAccelerated="true">
 
         <activity
             android:name=".MainActivity"
             android:exported="true"
-            android:configChanges="orientation|screenSize|keyboardHidden">
+            android:hardwareAccelerated="true"
+            android:configChanges="orientation|screenSize|keyboardHidden|density|screenLayout">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
 
-        <!-- Системная служба VPN для маршрутизации выбранных приложений и DNS/MTU -->
         <service
             android:name=".KonturVpnService"
             android:permission="android.permission.BIND_VPN_SERVICE"
